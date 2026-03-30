@@ -1,0 +1,825 @@
+/* Lyrics width control panel (shared UI) */
+
+@media (max-width: 767px) {
+  :root {
+    --lyrics-max-width: 90% !important;
+    --lyrics-width-control-bottom: calc(var(--lyrics-corner-inset) + var(--lyrics-mobile-bottom-margin, 8px)) !important;
+  }
+
+  #lyrics-width-control,
+  #lyrics-width-control:not(.position-right):not(.position-center) {
+    position: fixed !important;
+    top: auto !important;
+    left: var(--lyrics-corner-inset) !important;
+    right: var(--lyrics-corner-inset) !important;
+    bottom: var(--lyrics-width-control-bottom) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right {
+    position: fixed !important;
+    top: auto !important;
+    left: var(--lyrics-corner-inset) !important;
+    right: var(--lyrics-corner-inset) !important;
+    bottom: var(--lyrics-width-control-bottom) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center {
+    position: fixed !important;
+    top: auto !important;
+    left: var(--lyrics-corner-inset) !important;
+    right: var(--lyrics-corner-inset) !important;
+    bottom: var(--lyrics-width-control-bottom) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.show,
+  #lyrics-width-control:not(.position-right):not(.position-center).show {
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right.show {
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center.show {
+    transform: none !important;
+  }
+
+  #lyrics-width-control::before,
+  #lyrics-width-control.position-center::before {
+    display: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center)::before {
+    display: none !important;
+  }
+
+  #lyrics-width-control.position-right::before {
+    display: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-position-toggle {
+    left: 0 !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-display-mode-toggle {
+    left: var(--lyrics-mode-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-font-weight-toggle {
+    left: var(--lyrics-font-weight-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-background-toggle {
+    left: var(--lyrics-background-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-dynamic-theme-toggle {
+    left: var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-theme-color-cycle {
+    left: var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-theme-color-picker {
+    left: var(--lyrics-theme-color-picker-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-position-toggle {
+    left: calc(50% - (var(--lyrics-control-buttons-width, 0px) / 2)) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-display-mode-toggle {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-mode-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-font-weight-toggle {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-font-weight-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-background-toggle {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-background-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-dynamic-theme-toggle {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-theme-color-cycle {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-theme-color-picker {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-theme-color-picker-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-position-toggle {
+    left: auto !important;
+    right: var(--lyrics-position-toggle-right, 0px) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-display-mode-toggle {
+    left: auto !important;
+    right: var(--lyrics-mode-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap))) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-font-weight-toggle {
+    left: auto !important;
+    right: var(--lyrics-font-weight-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap))) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-background-toggle {
+    left: auto !important;
+    right: var(--lyrics-background-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap))) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-dynamic-theme-toggle {
+    left: auto !important;
+    right: var(--lyrics-dynamic-theme-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4))) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-theme-color-cycle {
+    left: auto !important;
+    right: var(--lyrics-theme-color-cycle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5))) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-theme-color-picker {
+    left: auto !important;
+    right: var(--lyrics-theme-color-picker-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6))) !important;
+    transform: none !important;
+  }
+
+  #lyrics-width-control #lyrics-width-handle,
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-width-handle {
+    display: none !important;
+  }
+
+  #lyrics-width-control.position-right #lyrics-width-handle {
+    display: none !important;
+  }
+
+  #lyrics-width-control.position-center #lyrics-width-handle {
+    display: none !important;
+  }
+
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-width-handle {
+    display: none !important;
+  }
+
+  #lyrics-width-control #lyrics-width-handle-secondary {
+    display: none;
+  }
+
+  #lyrics-width-control.position-center #lyrics-width-handle-secondary {
+    display: none !important;
+  }
+
+  #lyrics-width-control {
+    --lyrics-position-toggle-width: clamp(32px, 2.2vw, 40px) !important;
+    --lyrics-toggle-gap: 8px !important;
+    height: 0 !important;
+  }
+
+  #lyrics-position-toggle,
+  #lyrics-display-mode-toggle,
+  #lyrics-font-weight-toggle,
+  #lyrics-background-toggle,
+  #lyrics-dynamic-theme-toggle,
+  #lyrics-theme-color-cycle,
+  #lyrics-theme-color-picker {
+    width: clamp(32px, 2.2vw, 40px) !important;
+    height: clamp(32px, 2.2vw, 40px) !important;
+    bottom: 0 !important;
+  }
+
+  #lyrics-position-toggle svg,
+  #lyrics-display-mode-toggle svg,
+  #lyrics-font-weight-toggle svg,
+  #lyrics-background-toggle svg,
+  #lyrics-dynamic-theme-toggle svg,
+  #lyrics-theme-color-cycle svg,
+  #lyrics-theme-color-picker svg {
+    width: clamp(13px, 0.9vw, 16px) !important;
+    height: clamp(13px, 0.9vw, 16px) !important;
+  }
+
+  #lyrics-display-mode-toggle svg.mode-scroll-icon {
+    width: clamp(12px, 0.84vw, 15px) !important;
+    height: calc(100% - 2px) !important;
+    max-height: none !important;
+  }
+
+}
+
+#lyrics-width-control {
+  position: absolute;
+  bottom: var(--lyrics-width-control-bottom);
+  z-index: 8;
+  --lyrics-slider-width: var(--lyrics-max-width, 30%);
+  --lyrics-position-toggle-width: clamp(32px, 2.2vw, 40px);
+  --lyrics-toggle-gap: 8px;
+  left: var(--lyrics-corner-inset);
+  right: var(--lyrics-corner-inset);
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 14px;
+  padding: 0;
+  margin: 0;
+  display: block;
+  overflow: visible;
+  opacity: 0;
+  transform: none;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+#lyrics-width-control:not(.position-right) {
+  left: var(--lyrics-corner-inset);
+  right: var(--lyrics-corner-inset);
+}
+
+#lyrics-width-control.position-right {
+  left: var(--lyrics-corner-inset);
+  right: var(--lyrics-corner-inset);
+}
+
+#lyrics-width-control.position-center {
+  left: var(--lyrics-corner-inset);
+  right: var(--lyrics-corner-inset);
+  transform: none;
+}
+
+#lyrics-width-control::before {
+  content: "";
+  position: absolute;
+  width: var(--lyrics-slider-width);
+  top: 50%;
+  height: 0.5px;
+  transform: translateY(-50%);
+  background: rgba(210, 210, 210, 0.35);
+  pointer-events: none;
+}
+
+#lyrics-width-control:not(.position-right)::before {
+  left: 0;
+}
+
+#lyrics-width-control.position-right::before {
+  right: 0;
+}
+
+#lyrics-width-control.position-center::before {
+  left: calc(50% - (var(--lyrics-slider-width) / 2));
+}
+
+#lyrics-width-control.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+#lyrics-width-control:not(.show),
+#lyrics-width-control:not(.show) * {
+  pointer-events: none !important;
+}
+
+#lyrics-width-control.position-center.show {
+  transform: none;
+}
+
+#lyrics-scroll-hint {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Inter", "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.08s linear;
+  z-index: 9;
+}
+
+.lyrics-scroll-hint-text {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  background: rgba(18, 18, 18, 0.82);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 4px;
+  border: 0;
+}
+
+#lyrics-scroll-hint.position-right {
+  left: auto;
+  right: 0;
+}
+
+#lyrics-scroll-hint.position-center {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+}
+
+#lyrics-width-control.show #lyrics-scroll-hint {
+  opacity: 1;
+  transform: translateY(-50%);
+}
+
+#lyrics-width-control.position-center.show #lyrics-scroll-hint.position-center {
+  transform: translate(-50%, -50%);
+}
+
+#lyrics-scroll-hint.show {
+  opacity: 1;
+}
+
+#lyrics-scroll-hint.position-center.show {
+  transform: translate(-50%, -50%);
+}
+
+.lyrics-scroll-icon {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(255,255,255,0.35);
+  border-radius: 999px;
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: rgba(18, 18, 18, 0.82);
+}
+
+.lyrics-scroll-wheel {
+  width: 3px;
+  height: 3px;
+  background: rgba(255,255,255,0.9);
+  border-radius: 999px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  animation: scroll-updown 1.35s ease-in-out infinite;
+}
+
+@keyframes scroll-updown {
+  0%   { transform: translate(-50%, -50%) translateY(-3px); }
+  25%  { transform: translate(-50%, -50%) translateY(3px); }
+  50%  { transform: translate(-50%, -50%) translateY(-3px); }
+  75%  { transform: translate(-50%, -50%) translateY(3px); }
+  100% { transform: translate(-50%, -50%) translateY(-3px); }
+}
+
+#lyrics-position-toggle,
+#lyrics-display-mode-toggle,
+#lyrics-font-weight-toggle,
+#lyrics-background-toggle,
+#lyrics-dynamic-theme-toggle,
+#lyrics-theme-color-cycle,
+#lyrics-theme-color-picker {
+  position: absolute;
+  top: auto;
+  bottom: calc(100% + 10px);
+  width: clamp(32px, 2.2vw, 40px);
+  height: clamp(32px, 2.2vw, 40px);
+  padding: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(28, 28, 28, 0.88);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.14s ease, box-shadow 0.16s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  overflow: visible;
+}
+
+/* Floating label */
+.lyrics-btn-label {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: rgba(18, 18, 18, 0.82);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: "Inter", "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  box-shadow: none;
+}
+
+.lyrics-btn-label::after {
+  content: none;
+}
+
+#lyrics-position-toggle:hover .lyrics-btn-label,
+#lyrics-display-mode-toggle:hover .lyrics-btn-label,
+#lyrics-font-weight-toggle:hover .lyrics-btn-label,
+#lyrics-background-toggle:hover .lyrics-btn-label,
+#lyrics-dynamic-theme-toggle:hover .lyrics-btn-label,
+#lyrics-theme-color-cycle:hover .lyrics-btn-label,
+#lyrics-theme-color-picker:hover .lyrics-btn-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Icon sizing inside buttons */
+#lyrics-position-toggle svg,
+#lyrics-display-mode-toggle svg,
+#lyrics-font-weight-toggle svg,
+#lyrics-background-toggle svg,
+#lyrics-dynamic-theme-toggle svg,
+#lyrics-theme-color-cycle svg,
+#lyrics-theme-color-picker svg {
+  width: clamp(13px, 0.9vw, 16px);
+  height: clamp(13px, 0.9vw, 16px);
+  display: block;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+#lyrics-theme-color-cycle {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+#lyrics-theme-color-cycle svg {
+  color: var(--lyrics-theme-cycle-color, rgba(255, 255, 255, 0.82));
+  opacity: 1;
+  transform: scale(1.5);
+  transform-origin: center;
+}
+
+#lyrics-dynamic-theme-toggle svg {
+  color: var(--lyrics-dynamic-theme-icon-color, rgba(255, 255, 255, 0.82));
+}
+
+#lyrics-background-toggle svg {
+  color: var(--lyrics-bg-icon-color, currentColor);
+  transform: scale(1.5);
+  transform-origin: center;
+}
+
+#lyrics-font-weight-toggle svg {
+  transform: scale(1.125);
+  transform-origin: center;
+}
+
+#lyrics-display-mode-toggle svg.mode-scroll-icon {
+  width: clamp(12px, 0.84vw, 15px);
+  height: calc(100% - 2px);
+  max-height: none;
+}
+
+#lyrics-theme-color-cycle:hover,
+#lyrics-theme-color-cycle:active {
+  background: rgba(58, 58, 58, 0.95);
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-position-toggle {
+  left: 0;
+  right: auto;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-display-mode-toggle {
+  left: var(--lyrics-mode-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
+  right: auto;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-font-weight-toggle {
+  left: var(--lyrics-font-weight-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
+  right: auto;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-background-toggle {
+  left: var(--lyrics-background-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
+  right: auto;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-dynamic-theme-toggle {
+  left: var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)));
+  right: auto;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-theme-color-cycle {
+  left: var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)));
+  right: auto;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-theme-color-picker {
+  left: var(--lyrics-theme-color-picker-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)));
+  right: auto;
+}
+
+#lyrics-width-control.position-right #lyrics-position-toggle {
+  left: auto;
+  right: var(--lyrics-position-toggle-right, 0px);
+}
+
+#lyrics-width-control.position-center #lyrics-position-toggle {
+  left: calc(50% - (var(--lyrics-control-buttons-width, 0px) / 2));
+  right: auto;
+  transform: none;
+}
+
+#lyrics-width-control.position-right #lyrics-display-mode-toggle {
+  left: auto;
+  right: var(--lyrics-mode-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
+}
+
+#lyrics-width-control.position-right #lyrics-font-weight-toggle {
+  left: auto;
+  right: var(--lyrics-font-weight-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
+}
+
+#lyrics-width-control.position-right #lyrics-background-toggle {
+  left: auto;
+  right: var(--lyrics-background-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
+}
+
+#lyrics-width-control.position-right #lyrics-dynamic-theme-toggle {
+  left: auto;
+  right: var(--lyrics-dynamic-theme-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)));
+}
+
+#lyrics-width-control.position-right #lyrics-theme-color-cycle {
+  left: auto;
+  right: var(--lyrics-theme-color-cycle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)));
+}
+
+#lyrics-width-control.position-right #lyrics-theme-color-picker {
+  left: auto;
+  right: var(--lyrics-theme-color-picker-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)));
+}
+
+#lyrics-width-control.position-center #lyrics-display-mode-toggle {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-mode-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)))
+  );
+  right: auto;
+  transform: none;
+}
+
+#lyrics-width-control.position-center #lyrics-font-weight-toggle {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-font-weight-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)))
+  );
+  right: auto;
+  transform: none;
+}
+
+#lyrics-width-control.position-center #lyrics-background-toggle {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-background-toggle-left, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)))
+  );
+  right: auto;
+  transform: none;
+}
+
+#lyrics-width-control.position-center #lyrics-dynamic-theme-toggle {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)))
+  );
+  right: auto;
+  transform: none;
+}
+
+#lyrics-width-control.position-center #lyrics-theme-color-cycle {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)))
+  );
+  right: auto;
+  transform: none;
+}
+
+#lyrics-width-control.position-center #lyrics-theme-color-picker {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-theme-color-picker-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)))
+  );
+  right: auto;
+  transform: none;
+}
+
+#lyrics-position-toggle:hover,
+#lyrics-display-mode-toggle:hover,
+#lyrics-font-weight-toggle:hover,
+#lyrics-background-toggle:hover,
+#lyrics-theme-color-cycle:hover,
+#lyrics-theme-color-picker:hover {
+  background: rgba(58, 58, 58, 0.95);
+  border-color: rgba(255, 255, 255, 0.42);
+  color: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+#lyrics-position-toggle:active,
+#lyrics-display-mode-toggle:active,
+#lyrics-font-weight-toggle:active,
+#lyrics-background-toggle:active,
+#lyrics-theme-color-cycle:active,
+#lyrics-theme-color-picker:active {
+  background: rgba(235, 235, 235, 0.96);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: rgba(14, 14, 14, 0.95);
+  transform: scale(0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+#lyrics-dynamic-theme-toggle {
+  position: absolute;
+}
+
+#lyrics-dynamic-theme-toggle:hover {
+  border-color: rgba(255, 255, 255, 0.52);
+  color: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+}
+
+#lyrics-dynamic-theme-toggle:active {
+  border-color: rgba(255, 255, 255, 0.7);
+  transform: scale(0.95);
+}
+
+/* When dynamic theme is enabled, fixed preset cycling is disabled. */
+#lyrics-theme-color-cycle:disabled {
+  opacity: 0.52;
+  cursor: default;
+  pointer-events: none;
+  filter: none;
+}
+
+/* Native <input type="color"> is visually hidden; we open it programmatically. */
+#lyrics-theme-color-picker-input {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: auto;
+}
+
+#lyrics-width-handle,
+#lyrics-width-handle-secondary {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(235, 235, 235, 0.9);
+  border: 1px solid rgba(130, 130, 130, 0.8);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.28);
+  cursor: ew-resize;
+  pointer-events: auto;
+  z-index: 1;
+  transform: translateY(-50%);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#lyrics-width-handle-secondary {
+  display: none;
+}
+
+#lyrics-width-control:not(.position-right) #lyrics-width-handle {
+  left: calc(var(--lyrics-slider-width) - 6px);
+}
+
+#lyrics-width-control.position-right #lyrics-width-handle {
+  left: auto;
+  /* Track grows left from the corner; put handle on the inner (left) tip, mirroring left mode’s outer tip. */
+  right: calc(var(--lyrics-slider-width) - 6px);
+}
+
+#lyrics-width-control.position-center #lyrics-width-handle {
+  left: calc((50% - (var(--lyrics-slider-width) / 2)) - 6px);
+}
+
+#lyrics-width-control.position-center #lyrics-width-handle-secondary {
+  display: block;
+  left: calc((50% + (var(--lyrics-slider-width) / 2)) - 6px);
+}
+
+#lyrics-width-handle:active,
+#lyrics-width-handle-secondary:active {
+  background: rgba(230, 230, 230, 0.9);
+}
+
+@media (max-width: 767px) {
+  #lyrics-scroll-hint.mobile-mounted {
+    position: fixed !important;
+    top: 32px !important;
+    left: auto !important;
+    right: var(--lyrics-corner-inset) !important;
+    transform: none !important;
+    z-index: 9 !important;
+  }
+
+  #lyrics-scroll-hint.mobile-mounted.position-right {
+    left: var(--lyrics-corner-inset) !important;
+    right: auto !important;
+  }
+
+  #lyrics-scroll-hint.mobile-mounted.position-center {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+  }
+
+  #lyrics-scroll-hint.mobile-mounted.show {
+    opacity: 1 !important;
+  }
+
+  #lyrics-scroll-hint.mobile-mounted.position-center.show {
+    transform: translateX(-50%) !important;
+  }
+}

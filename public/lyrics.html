@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Floating Lyrics</title>
+    <link rel="icon" href="/icons/icon-serverless.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+
+    <script>
+      document.documentElement.style.setProperty('--lyrics-inactive-font-weight', '500');
+      document.documentElement.style.setProperty('--lyrics-active-font-weight', '600');
+      document.documentElement.style.setProperty('--text-bg', 'rgba(18, 18, 18, 1)');
+    </script>
+
+    <link rel="stylesheet" href="lyrics-styles.css">
+    <link rel="stylesheet" href="lyric-control.css">
+    <link rel="stylesheet" href="lyric.css">
+
+    <script type="module" src="scripts/lyrics.js"></script>
+  </head>
+  <body>
+    <div id="ambient-bg"></div>
+    <div id="layout-container">
+      <div id="lyrics-container" class="expanded">
+        <div id="synced-lyrics"></div>
+        <div id="plain-lyrics"></div>
+      </div>
+      <div id="song-info">
+        <div id="song-info-content">
+          <img id="song-info-cover" class="cover" src="" alt="Album Cover">
+          <div class="info">
+            <div id="song-info-title" class="title"></div>
+            <div id="song-info-artist" class="artist"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- #lyrics-width-control is injected by lyric-control.js -->
+  </body>
+</html>
