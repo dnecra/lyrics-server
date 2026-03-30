@@ -1,10 +1,9 @@
 // welcome-tour.js
 
-const STEPS = ['splash','shortcut','font-size','width','mode','position','close','tray','goodbye'];
+const STEPS = ['splash','shortcut','font-size','width','mode','position','close','tray'];
 const HOTKEY_GATED_STEPS = new Set(['shortcut', 'font-size', 'width', 'mode', 'position', 'close']);
 const SPLASH_AUTO_START_MS = 3000;
 const TRAY_AUTO_NEXT_MS = 5000;
-const GOODBYE_AUTO_NEXT_MS = 3000;
 const EXIT_FADE_MS = 260;
 let step = 0;
 let shortcutDone = false;
@@ -339,14 +338,14 @@ function go(name) {
   ensureDummyCloseButton();
   syncSkipButtonVisibility();
 
-  const fullscreen = name === 'splash' || name === 'goodbye';
+  const fullscreen = name === 'splash';
   dim.className = fullscreen ? 'full' : 'half';
   if (name === 'splash') dim.classList.add('under-layout');
   else dim.classList.remove('under-layout');
 
   if (fullscreen) {
     row.classList.add('hidden');
-    setTimeout(() => ({ splash: doSplash, goodbye: doGoodbye })[name]?.(), 0);
+    setTimeout(() => ({ splash: doSplash })[name]?.(), 0);
     return;
   }
 
@@ -507,7 +506,8 @@ function doSplash() {
 }
 
 // ─── GOODBYE ─────────────────────────────────────────────────────────────────
-function doGoodbye() {
+function doGoodbye() {}
+/*
   const wrap = document.createElement('div');
   wrap.id = 'wt-splash';
   wrap.innerHTML = `
@@ -552,6 +552,7 @@ function doGoodbye() {
 }
 
 // ─── word animations ──────────────────────────────────────────────────────────
+*/
 function splashWords(text, startIndex = 0) {
   return text.split(' ').map((w, i) =>
     `<span class="wt-sw" style="--wt-amp:8px;--wt-wd:1s;--wt-gd:2s;animation-delay:${((i + startIndex)*0.09).toFixed(3)}s">${w}</span>`
@@ -893,7 +894,7 @@ function doTray() {
   let advanced = false;
   let autoNextTimer = null;
   const clearCountdown = startGraphicCountdown(document.getElementById('wt-tray-timer'), TRAY_AUTO_NEXT_MS);
-  const advanceToGoodbye = () => {
+  const advanceToLyrics = () => {
     if (advanced) return;
     advanced = true;
     if (autoNextTimer) {
@@ -902,7 +903,7 @@ function doTray() {
     }
     clearCountdown();
     row.classList.remove('tray-step');
-    go('goodbye');
+    goToLyricsNow({ smooth: true });
   };
   stepCleanup = () => {
     if (autoNextTimer) {
@@ -917,13 +918,13 @@ function doTray() {
     if (typeof window.__wtDismissTrayScene === 'function') {
       window.__wtDismissTrayScene();
     } else {
-      advanceToGoodbye();
+      advanceToLyrics();
     }
   }, TRAY_AUTO_NEXT_MS);
 
   import('./welcome-tray-scene.js').then(({ mountTrayScene }) => {
     mountTrayScene(() => {
-      advanceToGoodbye();
+      advanceToLyrics();
     });
   });
 }

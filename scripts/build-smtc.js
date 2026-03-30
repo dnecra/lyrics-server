@@ -7,6 +7,14 @@ const DIST_DIR = path.join(ROOT, 'dist');
 const PKG_BIN = path.join(ROOT, 'node_modules', 'pkg', 'lib-es5', 'bin.js');
 const PACKAGE_JSON_PATH = path.join(ROOT, 'package.json');
 const TEMP_PKG_CONFIG_PREFIX = '.pkg-build-config';
+const OUTPUT_EXE_PATH = path.join(DIST_DIR, 'lyrics-smtc-x64.exe');
+const OUTPUT_7Z_PATH = path.join(DIST_DIR, 'lyrics-smtc-x64.7z');
+const LEGACY_ZIP_PATH = path.join(DIST_DIR, 'lyrics-smtc-x64.zip');
+const SEVEN_ZIP_CANDIDATES = [
+    '7z',
+    path.join(process.env['ProgramFiles'] || 'C:\\Program Files', '7-Zip', '7z.exe'),
+    path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', '7-Zip', '7z.exe')
+];
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -65,7 +73,40 @@ function removeFileIfExists(filePath) {
 function cleanupHelperOutputs() {
     const canonical = path.join(ROOT, 'smtc-helper', 'lyrics-smtc-bridge.exe');
     removeFileIfExists(canonical);
-    removeFileIfExists(path.join(ROOT, 'smtc-helper', 'x64', 'lyrics-smtc-bridge.exe'));
+}
+
+function resolveSevenZip() {
+    return SEVEN_ZIP_CANDIDATES.find(candidate => {
+        try {
+            if (candidate.toLowerCase() === '7z') {
+                const result = spawnSync(candidate, ['-h'], { stdio: 'ignore', shell: false });
+                return result.status === 0;
+            }
+            return fs.existsSync(candidate);
+        } catch {
+            return false;
+        }
+    }) || null;
+}
+
+function compressBuildArtifact(exePath, sevenZipPath) {
+    if (!sevenZipPath) {
+        throw new Error('7-Zip is required to create the .7z build artifact, but it was not found on this machine.');
+    }
+
+    removeFileIfExists(OUTPUT_7Z_PATH);
+    console.log(`[build-smtc] Compressing ${path.basename(exePath)} to ${path.basename(OUTPUT_7Z_PATH)} with 7-Zip`);
+    run(sevenZipPath, [
+        'a',
+        '-t7z',
+        OUTPUT_7Z_PATH,
+        exePath,
+        '-mx=9',
+        '-m0=LZMA2',
+        '-md=256m',
+        '-mfb=273',
+        '-ms=on'
+    ]);
 }
 
 function createPkgConfig() {
@@ -93,7 +134,7 @@ function pkgArgs(configPath, { noConsole = false } = {}) {
         '--public',
         '--no-bytecode',
         '--targets', 'node18-win-x64',
-        '--output', path.join('dist', 'lyrics-smtc-x64.exe')
+        '--output', OUTPUT_EXE_PATH
     ];
 
     if (noConsole) {
@@ -105,9 +146,11 @@ function pkgArgs(configPath, { noConsole = false } = {}) {
 
 function main() {
     const { noConsole } = parseArgs(process.argv);
+    const sevenZipPath = resolveSevenZip();
 
     fs.mkdirSync(DIST_DIR, { recursive: true });
     cleanupHelperOutputs();
+    removeFileIfExists(LEGACY_ZIP_PATH);
 
     runNpm(['run', 'build:bundle']);
 
@@ -121,6 +164,8 @@ function main() {
     } finally {
         removeFileIfExists(tempConfigPath);
     }
+
+    compressBuildArtifact(OUTPUT_EXE_PATH, sevenZipPath);
 }
 
 main();

@@ -202,16 +202,18 @@ body.paused #ambient-bg.paused {
   :root.is-phone-layout body.compact-no-lyrics #song-info,
   :root.is-phone-layout body.compact-no-lyrics-entering #song-info,
   :root.is-phone-layout body.compact-no-lyrics-leaving #song-info {
-    position: relative !important;
-    inset: auto !important;
+    position: fixed !important;
+    inset: 0 !important;
     opacity: 1 !important;
     visibility: visible !important;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: min(100%, 100dvw);
-    max-width: 100%;
-    max-height: min(100%, 100dvh);
+    width: 100dvw;
+    height: 100dvh;
+    max-width: 100dvw;
+    max-height: 100dvh;
+    margin: 0;
     overflow: visible;
     z-index: 2;
     transition: opacity 220ms ease;

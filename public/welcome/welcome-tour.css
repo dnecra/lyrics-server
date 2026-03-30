@@ -602,9 +602,6 @@ body.wt-splash-active #ambient-bg           { animation: none !important; }
 .wt-timer-graphic.is-running .wt-timer-progress {
   animation: wt-mini-countdown var(--wt-mini-duration, 3000ms) linear forwards;
 }
-.wt-footer-timer-graphic {
-  margin-left: auto;
-}
 .wt-tray-timer-graphic {
   filter: drop-shadow(0 0 8px rgba(var(--wt-accent-rgb), .45));
 }

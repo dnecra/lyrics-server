@@ -8,6 +8,7 @@ const GAP_FILL_THRESHOLD_PER_WORD_SECONDS = 1;
 const FINAL_BLANK_MIN_GAP_SECONDS = 3;
 const FINAL_BLANK_TARGET_GAP_SECONDS = 5;
 const ACTIVE_LYRIC_TIME_OFFSET_SECONDS = 0;
+const SYNCED_LYRIC_PARSE_OFFSET_SECONDS = 1.0;
 const LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS = 2.0;
 const AUTO_CENTER_TOLERANCE_PX = 3;
 let lyricLineElements = [];
@@ -988,7 +989,7 @@ function parseSyncedLyrics(syncedSource) {
                 const text = (match[4] || '').toString();
                 const trimmedText = text.trim();
                 const rawTime = (min * 60) + sec + (ms / divisor);
-                const time = rawTime - 1.5;
+                const time = rawTime - SYNCED_LYRIC_PARSE_OFFSET_SECONDS;
                 return {
                     time,
                     rawTime,

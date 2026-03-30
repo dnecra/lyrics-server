@@ -7,11 +7,11 @@
   "scripts": {
     "dev": "npm run build:smtc:helper && node server.js",
     "build:smtc:helper": "dotnet publish tools/smtc-bridge-cs/SmtcBridge.csproj -c Release -r win-x64 --self-contained -o smtc-helper/x64",
-    "build": "npm run build:smtc:helper && node scripts/build-smtc.js x64",
-    "build:all": "npm run build:smtc:helper && node scripts/build-smtc.js x64",
-    "build:x64": "npm run build:smtc:helper && node scripts/build-smtc.js x64",
-    "build:gui": "npm run build:smtc:helper && node scripts/build-smtc.js x64 --no-console",
-    "build:gui:x64": "npm run build:smtc:helper && node scripts/build-smtc.js x64 --no-console",
+    "build": "node scripts/build-smtc.js x64",
+    "build:all": "node scripts/build-smtc.js x64",
+    "build:x64": "node scripts/build-smtc.js x64",
+    "build:gui": "node scripts/build-smtc.js x64 --no-console",
+    "build:gui:x64": "node scripts/build-smtc.js x64 --no-console",
     "build:bundle": "esbuild server.js --bundle --platform=node --outfile=bundle.js --external:kuromoji"
   },
   "dependencies": {
