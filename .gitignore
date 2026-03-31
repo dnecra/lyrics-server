@@ -3,6 +3,7 @@ smtc-helper/
 /tools/smtc-bridge-cs/bin
 /tools/smtc-bridge-cs/obj
 *.zip
+*.sln
 
 bundle.js
 
