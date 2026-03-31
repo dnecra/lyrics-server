@@ -39,6 +39,9 @@ window.__lyricsLeadingSpacingGhostLinesCount = 0;
 // Lyrics app specific state
 let lyricsContainerClickable = false;
 const SETTINGS_KEY = 'lyricsSettings';
+const DEFAULT_LYRICS_PAGE_WIDTH_PERCENT = 15;
+const DEFAULT_LYRICS_PAGE_DISPLAY_MODE = 'fixed-2';
+const DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET = 'bold';
 
 function isDownloadPreviewPage() {
     return !!document.body?.classList.contains('download-page');
@@ -318,7 +321,7 @@ window.manuallyPaused = false;
 // Font sizing + layout defaults are centralized in `lyric-control.js`.
 let currentLyricFontSize = DEFAULT_FONT_SIZE;
 let lowResLyricFontSizeOffset = 0;
-let currentLyricFontWeightPreset = 'regular';
+let currentLyricFontWeightPreset = DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET;
 let currentLyricBackgroundPreset = DEFAULT_LYRIC_BACKGROUND_PRESET;
 const lyricControlLabelTouched = {
     mode: false,
@@ -334,8 +337,8 @@ let lyricsWidthBoundsObservedElement = null;
 let lyricsWidthBoundsResizeRaf = null;
 let recenterAfterResizeRaf = null;
 let viewportSyncTimeout = null;
-let currentLyricsMaxWidthVw = DEFAULT_LYRICS_WIDTH_VW;
-let currentLyricsDisplayMode = DEFAULT_LYRIC_DISPLAY_MODE;
+let currentLyricsMaxWidthVw = DEFAULT_LYRICS_PAGE_WIDTH_PERCENT;
+let currentLyricsDisplayMode = DEFAULT_LYRICS_PAGE_DISPLAY_MODE;
 let lyricsWidthDragActive = false;
 let lyricsWidthDragHandleSide = null;
 let isWidthShortcutHeld = false;
@@ -1625,14 +1628,10 @@ function initializeLyricsThemeColorCycle() {
 }
 
 function applySavedSettings() {
-    const isDownloadPage = isDownloadPreviewPage();
     const isPhoneLayout = isPhoneLayoutEnvironment();
-    const defaultLayoutPosition = isDownloadPage
-        ? 'right'
-        : (isPhoneLayout ? 'center' : 'left');
-    const defaultDisplayMode = isDownloadPage
-        ? 'scroll'
-        : (isPhoneLayout ? 'scroll' : DEFAULT_LYRIC_DISPLAY_MODE);
+    const defaultLayoutPosition = isPhoneLayout ? 'center' : 'left';
+    const defaultDisplayMode = isPhoneLayout ? 'scroll' : DEFAULT_LYRICS_PAGE_DISPLAY_MODE;
+    const defaultLyricsWidthPercent = DEFAULT_LYRICS_PAGE_WIDTH_PERCENT;
     const settings = loadSettings();
     if (settings) {
         if (settings.dynamicThemeEnabled !== undefined) {
@@ -1671,14 +1670,14 @@ function applySavedSettings() {
         if (settings.lyricsMaxWidthVw !== undefined) {
             applyLyricsMaxWidth(settings.lyricsMaxWidthVw);
         } else {
-            applyLyricsMaxWidth(DEFAULT_LYRICS_WIDTH_VW);
+            applyLyricsMaxWidth(defaultLyricsWidthPercent);
         }
 
         applyLyricsDisplayMode(settings.lyricsDisplayMode || defaultDisplayMode, {
             persist: false,
             refresh: false
         });
-        applyLyricFontWeightPreset(settings.lyricFontWeightPreset || 'regular', { persist: false });
+        applyLyricFontWeightPreset(settings.lyricFontWeightPreset || DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
 
         syncWidthControlPositionClass();
@@ -1689,20 +1688,14 @@ function applySavedSettings() {
         console.log('No saved settings found, using defaults');
         currentManualLyricThemeColorIndex = 0;
         applyLayoutPosition(defaultLayoutPosition);
-        if (isDownloadPage) {
-            currentLyricFontSize = isPhoneLayout ? 52 : 48;
-            lowResLyricFontSizeOffset = 0;
-            window._userSetFontSize = true;
-        } else {
-            window._userSetFontSize = false;
-        }
+        window._userSetFontSize = false;
         applyLyricsContainerClickability();
-        applyLyricsMaxWidth(isDownloadPage ? 60 : DEFAULT_LYRICS_WIDTH_VW);
+        applyLyricsMaxWidth(defaultLyricsWidthPercent);
         applyLyricsDisplayMode(defaultDisplayMode, {
             persist: false,
             refresh: false
         });
-        applyLyricFontWeightPreset('regular', { persist: false });
+        applyLyricFontWeightPreset(DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
     }
 

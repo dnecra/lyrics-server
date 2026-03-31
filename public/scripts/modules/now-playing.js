@@ -17,6 +17,7 @@ const LOCAL_PROGRESS_INTERVAL_MS = 250;
 let songInfoSwapTimer = null;
 let songInfoRevealTimer = null;
 let songInfoVisibilityFailSafeTimer = null;
+let songInfoLaunchRecoveryTimer = null;
 let pendingSongInfoRevealToken = 0;
 let lyricsSongInfoUpdateToken = 0;
 let pendingSongInfoContentKey = '';
@@ -63,6 +64,9 @@ function cancelSongInfoRevealTimer() {
 }
 function cancelSongInfoVisibilityFailSafeTimer() {
     if (songInfoVisibilityFailSafeTimer) { clearTimeout(songInfoVisibilityFailSafeTimer); songInfoVisibilityFailSafeTimer = null; }
+}
+function cancelSongInfoLaunchRecoveryTimer() {
+    if (songInfoLaunchRecoveryTimer) { clearTimeout(songInfoLaunchRecoveryTimer); songInfoLaunchRecoveryTimer = null; }
 }
 function clearPendingSongInfoReveal() {
     pendingSongInfoRevealToken = 0;
@@ -160,6 +164,14 @@ export function ensureLyricsSongInfoVisible() {
         replaySongInfoReveal(songInfo, songInfoContent);
         clearPendingSongInfoReveal();
     }
+}
+
+function scheduleSongInfoLaunchRecovery() {
+    cancelSongInfoLaunchRecoveryTimer();
+    songInfoLaunchRecoveryTimer = setTimeout(() => {
+        songInfoLaunchRecoveryTimer = null;
+        ensureLyricsSongInfoVisible();
+    }, 900);
 }
 
 function replayAmbientBgReveal(ambientBg) {
@@ -276,6 +288,7 @@ export function updateNowPlayingUI(data, options = {}) {
         updateMainAppUI(data, thumbnailUrl);
     } else {
         updateLyricsAppUI(data, thumbnailUrl, animate);
+        scheduleSongInfoLaunchRecovery();
     }
 
     state.isPaused = data.isPaused;
@@ -449,6 +462,7 @@ export async function updateNowPlayingFromData(data, handlers = {}) {
         stopProgressTracking();
         state.currentVideoId = data.videoId;
         resetSongState();
+        state.currentSongData = { ...displayData };
         if (incomingElapsed !== null) {
             syncPlaybackAnchor(data, nowMs);
         }

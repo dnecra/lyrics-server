@@ -570,6 +570,16 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     if (state.currentLyrics.length > 0 && lines.length !== state.currentLyrics.length) {
         lines = refreshLyricLineElements();
     }
+    const isLyricsDomReady =
+        Array.isArray(lines)
+        && lines.length > 0
+        && lines.length === state.currentLyrics.length;
+    if (!isLyricsDomReady) {
+        // Startup progress / websocket updates can arrive after lyric data is set
+        // but before the corresponding DOM lines are mounted. Do not cache the
+        // current render state yet, or fixed-line mode can skip the first real pass.
+        return;
+    }
 
     const isFrontendBlankNote = (line) => {
         const text = (line?.text || '').toString().trim();
