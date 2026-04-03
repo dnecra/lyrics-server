@@ -40,8 +40,19 @@ jobs:
     - name: Build
       run: npm run build
 
-    - name: Upload build artifact
+    - name: Show build sizes
+      shell: powershell
+      run: |
+        Get-ChildItem dist | Select-Object Name, Length | Format-Table -AutoSize
+
+    - name: Upload exe artifact
       uses: actions/upload-artifact@v4
       with:
-        name: lyrics-smtc-x64
-        path: dist/*
+        name: lyrics-smtc-x64-exe
+        path: dist/lyrics-smtc-x64.exe
+
+    - name: Upload 7z artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: lyrics-smtc-x64-7z
+        path: dist/lyrics-smtc-x64.7z
