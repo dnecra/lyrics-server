@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Optional release tag (example: v1.0.4). Leave empty to auto-increment the latest patch tag.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Determine release tag
+      id: version
+      shell: powershell
+      run: |
+        $manualTag = "${{ github.event.inputs.tag }}".Trim()
+
+        if ($manualTag) {
+          if ($manualTag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Tag must look like v1.0.4"
+          }
+
+          $tag = $manualTag
+        } else {
+          $latestTag = git tag --sort=-v:refname | Select-Object -First 1
+
+          if (-not $latestTag) {
+            $tag = "v1.0.0"
+          } elseif ($latestTag -notmatch '^v(\d+)\.(\d+)\.(\d+)$') {
+            throw "Latest tag '$latestTag' is not in v<major>.<minor>.<patch> format"
+          } else {
+            $major = [int]$matches[1]
+            $minor = [int]$matches[2]
+            $patch = [int]$matches[3] + 1
+            $tag = "v$major.$minor.$patch"
+          }
+        }
+
+        $existing = git tag -l $tag
+        if ($existing) {
+          throw "Tag '$tag' already exists"
+        }
+
+        "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        Write-Host "Release tag: $tag"
+
+    - name: Create and push tag
+      shell: powershell
+      run: |
+        $tag = "${{ steps.version.outputs.tag }}"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git tag $tag
+        git push origin $tag
+
+    - name: Use Node.js 24
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.13.0
+        cache: npm
+
+    - name: Setup .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.201
+
+    - name: Ensure 7-Zip is available
+      shell: powershell
+      run: |
+        if (Get-Command 7z -ErrorAction SilentlyContinue) {
+          Write-Host "7-Zip already available"
+          exit 0
+        }
+        choco install 7zip -y
+        7z
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build
+      run: npm run build
+
+    - name: Show build sizes
+      shell: powershell
+      run: |
+        Get-ChildItem dist | Select-Object Name, Length | Format-Table -AutoSize
+
+    - name: Create GitHub release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.tag }}
+        name: ${{ steps.version.outputs.tag }}
+        files: |
+          dist/lyrics-smtc-x64.exe
+          dist/lyrics-smtc-x64.7z
