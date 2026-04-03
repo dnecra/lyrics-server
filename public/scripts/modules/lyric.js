@@ -1273,14 +1273,7 @@ animateOutLyrics().then(() => {
                     console.log(`[${logTag}] Lyrics loaded and displayed (synced)`);
                 };
 
-                const revealDelayMs = Number(window.__lyricsSongInfoRevealPendingUntil || 0) > 0
-                    ? Math.max(0, Number(window.__lyricsSongInfoRevealPendingUntil || 0) - Date.now())
-                    : 0;
-                if (revealDelayMs > 0) {
-                    setTimeout(finalizeLyricsReveal, revealDelayMs);
-                } else {
-                    finalizeLyricsReveal();
-                }
+                finalizeLyricsReveal();
                 return;
             }
 

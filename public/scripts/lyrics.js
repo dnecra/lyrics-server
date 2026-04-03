@@ -1,6 +1,6 @@
 import { API_URL, state, resetSongState } from './modules/config.js';
 import { initWebSocket } from './modules/connection.js';
-import { ensureLyricsSongInfoVisible, settleLyricsSongInfoReveal, updateNowPlayingFromData } from './modules/now-playing.js';
+import { ensureLyricsSongInfoVisible, updateNowPlayingFromData } from './modules/now-playing.js';
 import { updateLyricsDisplay, displayLyricsUI, hideLyricsUI, getLyricDisplayMode, setLyricDisplayMode, centerActiveLyricLineStrict } from './modules/lyric.js';
 import {
     initLyricDynamicTheme,
@@ -1950,7 +1950,6 @@ function displayLyrics(data, fetchVideoId) {
         },
         logTag: 'LYRICS'
     });
-    settleLyricsSongInfoReveal();
     requestAnimationFrame(() => runViewportSyncAndRecenter());
     return result;
 }
@@ -1960,8 +1959,11 @@ function hideLyrics() {
         clearVideoId: true,
         logTag: 'LYRICS'
     });
-    settleLyricsSongInfoReveal();
     return result;
+}
+
+function resolveInitialBootVisibility() {
+    document.body?.classList.remove('lyrics-booting');
 }
 
 async function refreshSongStateFromServer() {
@@ -1973,19 +1975,25 @@ async function refreshSongStateFromServer() {
             if (response.status !== 404) {
                 console.warn(`[LYRICS] Failed to refresh song state: HTTP ${response.status}`);
             }
+            resolveInitialBootVisibility();
             return;
         }
 
         const data = await response.json();
-        if (!data || typeof data !== 'object' || !data.videoId) return;
+        if (!data || typeof data !== 'object' || !data.videoId) {
+            resolveInitialBootVisibility();
+            return;
+        }
 
         updateNowPlayingFromData(data, {
             isMainApp: false,
             onLyricsDisplay: displayLyrics,
             onLyricsHide: hideLyrics
         });
+        resolveInitialBootVisibility();
     } catch (error) {
         console.warn('[LYRICS] Failed to refresh song state from server:', error);
+        resolveInitialBootVisibility();
     }
 }
 
@@ -1999,6 +2007,7 @@ function handleWebSocketMessage(message) {
                     onLyricsDisplay: displayLyrics,
                     onLyricsHide: hideLyrics
                 });
+                resolveInitialBootVisibility();
             }
             break;
 
@@ -2029,6 +2038,7 @@ function handleWebSocketMessage(message) {
                         document.body.classList.remove('paused');
                     }
                 }
+                resolveInitialBootVisibility();
 
                 updateLyricsDisplay(serverElapsed, { trustedTiming: true });
 
@@ -2051,6 +2061,7 @@ function handleWebSocketMessage(message) {
                     onLyricsDisplay: displayLyrics,
                     onLyricsHide: hideLyrics
                 });
+                resolveInitialBootVisibility();
             }
             break;
 
