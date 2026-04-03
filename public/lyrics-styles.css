@@ -803,20 +803,37 @@ body.window-resizing #close-window-control {
   mask-image: none;
 }
 
-/* Feather (top only) for triple/double fixed modes. */
-#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-3"],
-#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-2"] {
+/* Triple mode: feather both top and bottom edges. */
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-3"] {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
     #000 var(--lyrics-edge-fade-size),
-    #000 100%
+    #000 calc(100% - var(--lyrics-edge-fade-size)),
+    transparent 100%
   );
   mask-image: linear-gradient(
     to bottom,
     transparent 0%,
     #000 var(--lyrics-edge-fade-size),
-    #000 100%
+    #000 calc(100% - var(--lyrics-edge-fade-size)),
+    transparent 100%
+  );
+}
+
+/* Double mode: feather bottom edge only. */
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-2"] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--lyrics-edge-fade-size)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--lyrics-edge-fade-size)),
+    transparent 100%
   );
 }
 

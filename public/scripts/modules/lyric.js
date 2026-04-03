@@ -95,7 +95,12 @@ function countLyricWords(text) {
 }
 
 function refreshLyricLineElements() {
-    lyricLineElements = Array.from(document.querySelectorAll('#synced-lyrics .lyric-line, #plain-lyrics .lyric-line'));
+    lyricLineElements = Array.from(document.querySelectorAll('#synced-lyrics .lyric-line, #plain-lyrics .lyric-line'))
+        .sort((a, b) => {
+            const aIndex = Number.parseInt(a?.dataset?.index || '-1', 10);
+            const bIndex = Number.parseInt(b?.dataset?.index || '-1', 10);
+            return aIndex - bIndex;
+        });
     return lyricLineElements;
 }
 
@@ -126,10 +131,31 @@ function shouldShowLineForDisplayMode(mode, currentIndex, lineIndex) {
         return true;
     }
     if (mode === 'fixed-3') return Math.abs(lineIndex - currentIndex) <= 1;
-    // fixed-2: show previous (top, inactive) + current (bottom, active)
-    if (mode === 'fixed-2') return lineIndex === (currentIndex - 1) || lineIndex === currentIndex;
+    // fixed-2: show current (top, active) + next (bottom, inactive)
+    if (mode === 'fixed-2') return lineIndex === currentIndex || lineIndex === (currentIndex + 1);
     if (mode === 'fixed-1') return lineIndex === currentIndex;
     return true;
+}
+
+function reorderFixedModeVisibleLines(mode, currentIndex, lines) {
+    if (!Array.isArray(lines) || lines.length === 0) return;
+    if (!Number.isFinite(currentIndex) || currentIndex < 0) return;
+    if (mode === 'scroll' || mode === 'fixed-1') return;
+
+    const parent = lines[0]?.parentElement;
+    if (!parent) return;
+
+    const targetOrder = mode === 'fixed-2'
+        ? [currentIndex, currentIndex + 1]
+        : [currentIndex - 1, currentIndex, currentIndex + 1];
+
+    targetOrder.forEach((index) => {
+        if (!Number.isFinite(index) || index < 0) return;
+        const line = lines[index];
+        if (!line || line.parentElement !== parent) return;
+        if (line.classList.contains('fixed-hidden')) return;
+        parent.appendChild(line);
+    });
 }
 
 export function getLyricDisplayMode() {
@@ -659,6 +685,10 @@ export function updateLyricsDisplay(currentTime, options = {}) {
 
         if (activatingLines.length > 0) {
             queueActivatingCurrentCleanup(activatingLines);
+        }
+
+        if (displayMode !== 'scroll') {
+            reorderFixedModeVisibleLines(displayMode, currentIndex, lines);
         }
 
         if ((hasActiveLineChanged || hasDisplayModeChanged || hasExpandedModeChanged) && displayMode === 'scroll') {
