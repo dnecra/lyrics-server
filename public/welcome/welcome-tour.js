@@ -631,7 +631,7 @@ function doShortcut() {
   row.classList.add('shortcut-step');
   setGuideContent(`
     <div class="wt-step">1 / 6</div>
-    <div class="wt-label">${guideWords('Activate the Controller')}</div>
+    <div class="wt-label">${guideWords('Press Alt+Shift+F')}</div>
     <div class="wt-desc">Press and <strong>hold</strong> <span class="wt-combo">Alt + Shift + F</span> to activate and show the Controller.</div>
   `, `<span class="wt-td" id="wt-td"></span><span id="wt-tl">Hold <span class="wt-keycap" data-hotkey="alt">Alt</span> <span class="wt-keycap" data-hotkey="shift">Shift</span> <span class="wt-keycap" data-hotkey="f">F</span></span>`);
   setHotkeyReminderVisible(true);

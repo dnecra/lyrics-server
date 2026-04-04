@@ -1568,6 +1568,10 @@ function updateAllLyricControlLabels() {
     updateLyricsThemeColorCycleLabel();
 }
 
+function resolveInitialBootVisibility() {
+    document.body?.classList.remove('lyrics-booting');
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
     if (window.__lyricsAppInitDone) return;
@@ -1587,6 +1591,7 @@ async function init() {
 
         // Render the static preview first so optional control setup errors cannot blank the page.
         runWelcomeInitStep('bootstrapStaticSong', bootstrapStaticSong);
+        resolveInitialBootVisibility();
         runWelcomeInitStep('startProgressTracking', startProgressTracking);
 
         runWelcomeInitStep('applySavedSettings', applySavedSettings);
@@ -1635,9 +1640,15 @@ async function init() {
         runWelcomeInitStep('scheduleViewportSyncAndRecenter', scheduleViewportSyncAndRecenter);
         document.body.classList.remove('paused');
         window.__lyricsAppInitDone = true;
+        resolveInitialBootVisibility();
     })();
-    try { await window.__lyricsAppInitPromise; }
-    catch (error) { window.__lyricsAppInitPromise = null; throw error; }
+    try {
+        await window.__lyricsAppInitPromise;
+    } catch (error) {
+        window.__lyricsAppInitPromise = null;
+        resolveInitialBootVisibility();
+        throw error;
+    }
 }
 
 if (document.readyState === 'loading') {
