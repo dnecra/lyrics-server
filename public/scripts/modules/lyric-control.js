@@ -27,6 +27,7 @@ export function createLyricControlPanel() {
         fontWeight: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><text x="1" y="17" font-size="13" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-weight="400" fill="currentColor" opacity="0.65">A</text><text x="10" y="18" font-size="16" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-weight="800" fill="currentColor">A</text></svg>`,
         // Panel with a dim content area — background opacity
         background: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>`,
+        translation: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 205.83 206.19" fill="currentColor" stroke="none" aria-hidden="true"><path d="M77.94,26.02h41.5c.35,0,4.87,2.8,5.55,3.45,5.6,5.3,5.38,14.58-.54,19.56-6.62,5.58-18.27,1.87-26.38,3.12-3.87,16.69-9.3,32.79-15.96,48.54-1.81,4.27-7.12,10.4-4.64,14.25,5.31,8.26,18.96,14.27,11.89,27s-21.95,3.34-28.4-4.92c-4.89,8.6-11.86,17.58-18.5,25.01-3.75,4.2-18.43,19.61-22.46,21.54-12.91,6.21-25.69-6.77-17.06-19.07,5.25-7.48,17.26-16.92,23.98-25.02,6.21-7.48,12.15-15.62,16.81-24.14.16-1.92-17.09-27.21-19-33.61-4.71-15.73,14.35-24.59,23.66-11.66,1.01,1.4,9.32,18.85,10.55,17.93l12.01-36H9.44c-1.06,0-6.03-3.72-6.96-5.04-3.3-4.72-3.32-11.18,0-15.92.93-1.32,5.9-5.04,6.96-5.04h41.5C49.92,16,51.01,0,64.44,0c5.25,0,13.5,6.29,13.5,11.52v14.5Z"/><path d="M171.78,180.18l-60.17-.2c-1.09.26-8.2,17.2-10.24,19.97-10.66,14.52-31,1.2-22.61-14.61,17.83-31.34,31.11-67.87,49.32-98.68,6.5-10.98,16.04-14.1,24.69-2.98l52.49,105.52c2.07,5.87-1.84,12.84-7.31,15.32-15.66,7.08-20.83-14.24-26.17-24.34ZM157.94,154.02l-16.5-34.01-16.5,34.01h33Z"/></svg>`,
         // Hidden in runtime (dynamic theme is merged into the Color cycle button).
         theme: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><text x="12" y="14.8" font-size="11.8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-weight="700" text-anchor="middle" fill="currentColor">A</text><rect x="6.2" y="17.1" width="11.6" height="2.3" rx="1.15" fill="currentColor"/></svg>`,
         // Theme color icon (circle swatch).
@@ -75,6 +76,12 @@ export function createLyricControlPanel() {
         'Switch lyric background',
         'Background',
         ICONS.background
+    ));
+    widthControl.appendChild(btn(
+        'lyrics-translation-toggle',
+        'Toggle lyric translation',
+        'Translation',
+        ICONS.translation
     ));
     widthControl.appendChild(btn(
         'lyrics-dynamic-theme-toggle',
@@ -201,6 +208,7 @@ export function initLyricControlPanel(deps = {}) {
     const displayModeToggle = document.getElementById('lyrics-display-mode-toggle');
     const fontWeightToggle = document.getElementById('lyrics-font-weight-toggle');
     const backgroundToggle = document.getElementById('lyrics-background-toggle');
+    const translationToggle = document.getElementById('lyrics-translation-toggle');
     const dynamicThemeToggle = document.getElementById('lyrics-dynamic-theme-toggle');
     const themeColorCycle = document.getElementById('lyrics-theme-color-cycle');
 
@@ -326,6 +334,7 @@ export function initLyricControlPanel(deps = {}) {
     addButtonClick(displayModeToggle, () => deps.cycleLyricsDisplayMode?.());
     addButtonClick(fontWeightToggle, () => deps.cycleLyricFontWeightPreset?.());
     addButtonClick(backgroundToggle, () => deps.cycleLyricBackgroundPreset?.());
+    addButtonClick(translationToggle, () => deps.toggleLyricTranslation?.());
     const syncThemePresetEnabledState = () => {
         if (dynamicThemeToggle) {
             dynamicThemeToggle.hidden = true;

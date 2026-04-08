@@ -387,10 +387,12 @@ let currentLyricFontSize = DEFAULT_FONT_SIZE;
 let lowResLyricFontSizeOffset = 0;
 let currentLyricFontWeightPreset = 'regular';
 let currentLyricBackgroundPreset = DEFAULT_LYRIC_BACKGROUND_PRESET;
+let currentLyricRomanizationMode = 'romanized';
 const lyricControlLabelTouched = {
     mode: false,
     font: false,
     background: false,
+    translation: false,
     position: false,
     dynamic: false,
     color: false
@@ -405,6 +407,7 @@ let lyricsWidthDragHandleSide = null;
 let isWidthShortcutHeld = false;
 let isWidthControlHovered = false;
 let widthControlAutoHideTimeout = null;
+let translationToggleVisibilityObserver = null;
 let configuredLyricsMinWidthVwCache = null;
 let configuredLyricsMaxWidthVwCache = null;
 let configuredLyricsMinWidthPxCache = null;
@@ -762,6 +765,50 @@ function normalizeLyricBackgroundPreset(preset) {
     return LYRIC_BACKGROUND_ORDER.includes(normalized) ? normalized : DEFAULT_LYRIC_BACKGROUND_PRESET;
 }
 
+function normalizeLyricRomanizationMode(mode) {
+    if (typeof mode !== 'string') return 'romanized';
+    const normalized = mode.trim().toLowerCase();
+    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'romanized';
+}
+
+function applyLyricRomanizationMode(mode, { persist = true } = {}) {
+    currentLyricRomanizationMode = normalizeLyricRomanizationMode(mode);
+    const root = document.documentElement;
+    root.classList.toggle('lyrics-translation-hidden', currentLyricRomanizationMode !== 'both');
+    root.classList.toggle('lyrics-romanization-off', currentLyricRomanizationMode === 'off');
+    updateLyricsTranslationToggleLabel();
+    if (persist) saveSettings();
+}
+
+function hasVisibleRomanizedLyrics() {
+    return !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
+}
+
+function syncTranslationToggleVisibility() {
+    const btn = document.getElementById('lyrics-translation-toggle');
+    if (!btn) return;
+    const visible = hasVisibleRomanizedLyrics();
+    btn.hidden = !visible;
+    btn.style.display = visible ? '' : 'none';
+    btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    syncWidthControlButtonMetrics();
+}
+
+function initTranslationToggleVisibilityObserver() {
+    if (translationToggleVisibilityObserver || typeof MutationObserver === 'undefined') return;
+    const synced = document.getElementById('synced-lyrics');
+    const plain = document.getElementById('plain-lyrics');
+    if (!synced && !plain) return;
+
+    translationToggleVisibilityObserver = new MutationObserver(() => {
+        syncTranslationToggleVisibility();
+    });
+
+    if (synced) translationToggleVisibilityObserver.observe(synced, { childList: true, subtree: true });
+    if (plain) translationToggleVisibilityObserver.observe(plain, { childList: true, subtree: true });
+    syncTranslationToggleVisibility();
+}
+
 function setLyricButtonLabel(button, text) {
     if (!button) return;
     const labelEl = button.querySelector('.lyrics-btn-label');
@@ -833,6 +880,7 @@ function resetLyricControlHoverLabels() {
     lyricControlLabelTouched.mode = false;
     lyricControlLabelTouched.font = false;
     lyricControlLabelTouched.background = false;
+    lyricControlLabelTouched.translation = false;
     lyricControlLabelTouched.position = false;
     lyricControlLabelTouched.dynamic = false;
     lyricControlLabelTouched.color = false;
@@ -888,6 +936,28 @@ function updateLyricsBackgroundToggleLabel() {
     }
     btn.setAttribute('aria-label', `Switch lyric background (current: ${preset.label})`);
     btn.setAttribute('title', `Background: ${preset.label}`);
+    syncWidthControlButtonMetrics();
+}
+
+function updateLyricsTranslationToggleLabel() {
+    const btn = document.getElementById('lyrics-translation-toggle');
+    if (!btn) return;
+    syncTranslationToggleVisibility();
+    if (btn.hidden) return;
+    const mode = normalizeLyricRomanizationMode(currentLyricRomanizationMode);
+    const labelMap = {
+        romanized: 'Romanized',
+        both: 'Both',
+        off: 'Off'
+    };
+    const titleMap = {
+        romanized: 'Romanization: On',
+        both: 'Romanization + Translation: On',
+        off: 'Romanization + Translation: Off'
+    };
+    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanize');
+    btn.setAttribute('aria-label', `Cycle lyric romanization mode (current: ${labelMap[mode]})`);
+    btn.setAttribute('title', titleMap[mode]);
     syncWidthControlButtonMetrics();
 }
 
@@ -1050,6 +1120,7 @@ function syncWidthControlButtonMetrics() {
     const modeButton = document.getElementById('lyrics-display-mode-toggle');
     const weightButton = document.getElementById('lyrics-font-weight-toggle');
     const backgroundButton = document.getElementById('lyrics-background-toggle');
+    const translationButton = document.getElementById('lyrics-translation-toggle');
     const dynamicThemeToggleButton = document.getElementById('lyrics-dynamic-theme-toggle');
     const themeColorCycleButton = document.getElementById('lyrics-theme-color-cycle');
     if (
@@ -1058,6 +1129,7 @@ function syncWidthControlButtonMetrics() {
         || !modeButton
         || !weightButton
         || !backgroundButton
+        || !translationButton
         || !dynamicThemeToggleButton
         || !themeColorCycleButton
     ) return;
@@ -1066,6 +1138,8 @@ function syncWidthControlButtonMetrics() {
     const modeWidth = Math.ceil(modeButton.offsetWidth);
     const weightWidth = Math.ceil(weightButton.offsetWidth);
     const backgroundWidth = Math.ceil(backgroundButton.offsetWidth);
+    const translationVisible = !!(translationButton.offsetParent && !translationButton.hidden);
+    const translationWidth = translationVisible ? Math.ceil(translationButton.offsetWidth) : 0;
     const dynamicThemeToggleVisible = !!(dynamicThemeToggleButton.offsetParent && !dynamicThemeToggleButton.hidden);
     const dynamicThemeToggleWidth = dynamicThemeToggleVisible ? Math.ceil(dynamicThemeToggleButton.offsetWidth) : 0;
     const themeColorCycleWidth = Math.ceil(themeColorCycleButton.offsetWidth);
@@ -1073,27 +1147,34 @@ function syncWidthControlButtonMetrics() {
     const modeOffset = positionWidth + gap;
     const weightOffset = positionWidth + modeWidth + (gap * 2);
     const backgroundOffset = weightOffset + weightWidth + gap;
-    const dynamicThemeToggleOffset = backgroundOffset + backgroundWidth + gap;
+    const translationOffset = backgroundOffset + backgroundWidth + gap;
+    const dynamicThemeToggleOffset = translationVisible
+        ? translationOffset + translationWidth + gap
+        : backgroundOffset + backgroundWidth + gap;
     const themeColorCycleOffset = dynamicThemeToggleVisible
         ? dynamicThemeToggleOffset + dynamicThemeToggleWidth + gap
-        : backgroundOffset + backgroundWidth + gap;
+        : dynamicThemeToggleOffset;
     const totalWidth = dynamicThemeToggleVisible
-        ? positionWidth + modeWidth + weightWidth + backgroundWidth + dynamicThemeToggleWidth + themeColorCycleWidth + (gap * 5)
-        : positionWidth + modeWidth + weightWidth + backgroundWidth + themeColorCycleWidth + (gap * 4);
+        ? positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + dynamicThemeToggleWidth + themeColorCycleWidth + (gap * (translationVisible ? 6 : 5))
+        : positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + themeColorCycleWidth + (gap * (translationVisible ? 5 : 4));
     widthControl.style.setProperty('--lyrics-control-buttons-width', `${totalWidth}px`);
     widthControl.style.setProperty('--lyrics-mode-toggle-left', `${modeOffset}px`);
     widthControl.style.setProperty('--lyrics-font-weight-toggle-left', `${weightOffset}px`);
     widthControl.style.setProperty('--lyrics-background-toggle-left', `${backgroundOffset}px`);
+    widthControl.style.setProperty('--lyrics-translation-toggle-left', `${translationOffset}px`);
     widthControl.style.setProperty('--lyrics-dynamic-theme-toggle-left', `${dynamicThemeToggleOffset}px`);
     widthControl.style.setProperty('--lyrics-theme-color-cycle-left', `${themeColorCycleOffset}px`);
     widthControl.style.setProperty('--lyrics-position-toggle-right', `0px`);
     widthControl.style.setProperty('--lyrics-mode-toggle-right', `${positionWidth + gap}px`);
     widthControl.style.setProperty('--lyrics-font-weight-toggle-right', `${positionWidth + modeWidth + (gap * 2)}px`);
     widthControl.style.setProperty('--lyrics-background-toggle-right', `${positionWidth + modeWidth + weightWidth + (gap * 3)}px`);
-    widthControl.style.setProperty('--lyrics-dynamic-theme-toggle-right', `${positionWidth + modeWidth + weightWidth + backgroundWidth + (gap * 4)}px`);
-    widthControl.style.setProperty('--lyrics-theme-color-cycle-right', dynamicThemeToggleVisible
-        ? `${positionWidth + modeWidth + weightWidth + backgroundWidth + dynamicThemeToggleWidth + (gap * 5)}px`
+    widthControl.style.setProperty('--lyrics-translation-toggle-right', `${positionWidth + modeWidth + weightWidth + backgroundWidth + (gap * 4)}px`);
+    widthControl.style.setProperty('--lyrics-dynamic-theme-toggle-right', translationVisible
+        ? `${positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + (gap * 5)}px`
         : `${positionWidth + modeWidth + weightWidth + backgroundWidth + (gap * 4)}px`);
+    widthControl.style.setProperty('--lyrics-theme-color-cycle-right', dynamicThemeToggleVisible
+        ? `${positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + dynamicThemeToggleWidth + (gap * (translationVisible ? 6 : 5))}px`
+        : `${positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + (gap * (translationVisible ? 5 : 4))}px`);
 }
 
 function updateLyricsPositionToggleLabel() {
@@ -1221,6 +1302,9 @@ function applySavedSettings() {
         applyLyricsDisplayMode(settings.lyricsDisplayMode || (isPhoneLayoutEnvironment() ? 'scroll' : DEFAULT_LYRIC_DISPLAY_MODE), { persist: false, refresh: false });
         applyLyricFontWeightPreset(settings.lyricFontWeightPreset || 'regular', { persist: false });
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
+        const savedRomanizationMode = settings.lyricRomanizationMode
+            || (settings.lyricTranslationEnabled === true ? 'both' : 'romanized');
+        applyLyricRomanizationMode(savedRomanizationMode, { persist: false });
         syncWidthControlPositionClass(); updateLyricsPositionToggleLabel(); applyLyricsContainerClickability();
     } else {
         const layoutContainer = document.getElementById('layout-container');
@@ -1235,6 +1319,7 @@ function applySavedSettings() {
         applyLyricsDisplayMode(isPhoneLayoutEnvironment() ? 'scroll' : DEFAULT_LYRIC_DISPLAY_MODE, { persist: false, refresh: false });
         applyLyricFontWeightPreset('regular', { persist: false });
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
+        applyLyricRomanizationMode('romanized', { persist: false });
     }
     applyLyricSizing();
 }
@@ -1559,11 +1644,20 @@ function cycleLyricThemeColorButton() {
     saveSettings();
 }
 
+function toggleLyricTranslationButton() {
+    lyricControlLabelTouched.translation = true;
+    const order = ['romanized', 'both', 'off'];
+    const currentIndex = order.indexOf(normalizeLyricRomanizationMode(currentLyricRomanizationMode));
+    const nextMode = order[(currentIndex + 1) % order.length];
+    applyLyricRomanizationMode(nextMode, { persist: true });
+}
+
 function updateAllLyricControlLabels() {
     updateLyricsPositionToggleLabel();
     updateLyricsDisplayModeToggleLabel();
     updateLyricsFontWeightToggleLabel();
     updateLyricsBackgroundToggleLabel();
+    updateLyricsTranslationToggleLabel();
     updateLyricsDynamicThemeToggleLabel();
     updateLyricsThemeColorCycleLabel();
 }
@@ -1611,6 +1705,7 @@ async function init() {
             cycleLyricsDisplayMode,
             cycleLyricFontWeightPreset,
             cycleLyricBackgroundPreset,
+            toggleLyricTranslation: toggleLyricTranslationButton,
             toggleLyricDynamicTheme: toggleLyricDynamicThemeButton,
             cycleLyricThemeColor: cycleLyricThemeColorButton,
             cycleLyricTheme: cycleLyricThemeColorButton,
@@ -1632,6 +1727,7 @@ async function init() {
         }));
         runWelcomeInitStep('initializeLyricControlLabelHoverReset', initializeLyricControlLabelHoverReset);
         runWelcomeInitStep('initializeDynamicThemeDependentSync', initializeDynamicThemeDependentSync);
+        runWelcomeInitStep('initTranslationToggleVisibilityObserver', initTranslationToggleVisibilityObserver);
 
         const lyricsContainer = document.getElementById('lyrics-container');
         if (lyricsContainer) lyricsContainer.classList.add('expanded');

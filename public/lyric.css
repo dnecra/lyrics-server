@@ -230,13 +230,56 @@ html {
   font-style: italic;
 }
 
+.lyric-line .lyric-translation {
+  display: block;
+  order: 1;
+  font-family: inherit;
+  font-size: var(--lyric-translation-size, calc(var(--lyric-font-size, 27px) * 1.64));
+  line-height: 1.14;
+  font-weight: 800 !important;
+  font-variation-settings: "wght" 800;
+  letter-spacing: 0.01em;
+  opacity: calc(var(--lyrics-inactive-opacity) * 0.92);
+  color: color-mix(in srgb, currentColor 88%, white 12%);
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.45);
+  white-space: normal;
+}
+
+:root.lyrics-translation-hidden .lyric-line .lyric-translation {
+  display: none !important;
+}
+
+:root.lyrics-romanization-off .lyric-line .romanized,
+:root.lyrics-romanization-off .lyric-line .lyric-translation {
+  display: none !important;
+}
+
+:root.lyrics-romanization-off .lyric-line.romanizable .text-lyrics {
+  display: block;
+}
+
+:root.lyrics-romanization-off .lyric-line.romanizable .text-lyrics > .lyric-words {
+  display: inline;
+  font-size: var(--lyric-font-size, 27px) !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  order: initial;
+}
+
+.lyric-line .lyric-translation .translation-word {
+  font-size: inherit !important;
+  font-weight: 400 !important;
+  font-variation-settings: "wght" 400;
+  line-height: inherit !important;
+}
+
 /* The original non-Latin text (Japanese/Korean/Chinese) inside romanizable lines */
 .lyric-line.romanizable .text-lyrics > .lyric-words {
   display: block;
   font-size: calc(var(--lyric-font-size, 27px) * 0.5);
   font-weight: 200 !important;
   line-height: calc(var(--lyric-font-size, 27px) * 0.58);
-  order: 1; /* sits below the romanized text */
+  order: 2; /* sits below the romanized + translation rows */
 }
 
 /* Words inside romanizable rows inherit sizing from the shared word layer. */
@@ -246,8 +289,24 @@ html {
   animation: var(--lyrics-animations);
 }
 
+.lyric-line.current .lyric-translation .translation-word {
+  animation: var(--lyrics-animations);
+}
+
+.lyric-line.current .lyric-translation {
+  opacity: calc(var(--lyrics-active-opacity) * 0.78);
+  font-weight: 400 !important;
+  font-variation-settings: "wght" 400;
+}
+
+.lyric-line.current .lyric-translation .translation-word {
+  font-weight: 400 !important;
+  font-variation-settings: "wght" 400;
+}
+
 .lyric-line.current .lyric-word,
-.lyric-line.current .romanized-word {
+.lyric-line.current .romanized-word,
+.lyric-line.current .translation-word {
   -webkit-text-stroke-width: var(--lyrics-active-stroke-width);
   -webkit-text-stroke-color: var(--lyrics-active-stroke-color);
   paint-order: stroke fill;

@@ -84,14 +84,20 @@
     transform: none !important;
   }
 
+  #lyrics-width-control.position-right #lyrics-translation-toggle {
+    left: var(--lyrics-translation-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4))) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
   #lyrics-width-control.position-right #lyrics-dynamic-theme-toggle {
-    left: var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4))) !important;
+    left: var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5))) !important;
     right: auto !important;
     transform: none !important;
   }
 
   #lyrics-width-control.position-right #lyrics-theme-color-cycle {
-    left: var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5))) !important;
+    left: var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6))) !important;
     right: auto !important;
     transform: none !important;
   }
@@ -135,10 +141,19 @@
     transform: none !important;
   }
 
+  #lyrics-width-control.position-center #lyrics-translation-toggle {
+    left: calc(
+      50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+      var(--lyrics-translation-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)))
+    ) !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
   #lyrics-width-control.position-center #lyrics-dynamic-theme-toggle {
     left: calc(
       50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
-      var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)))
+      var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)))
     ) !important;
     right: auto !important;
     transform: none !important;
@@ -147,7 +162,7 @@
   #lyrics-width-control.position-center #lyrics-theme-color-cycle {
     left: calc(
       50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
-      var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)))
+      var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)))
     ) !important;
     right: auto !important;
     transform: none !important;
@@ -186,15 +201,21 @@
     transform: none !important;
   }
 
+  #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-translation-toggle {
+    left: auto !important;
+    right: var(--lyrics-translation-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4))) !important;
+    transform: none !important;
+  }
+
   #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-dynamic-theme-toggle {
     left: auto !important;
-    right: var(--lyrics-dynamic-theme-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4))) !important;
+    right: var(--lyrics-dynamic-theme-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5))) !important;
     transform: none !important;
   }
 
   #lyrics-width-control:not(.position-right):not(.position-center) #lyrics-theme-color-cycle {
     left: auto !important;
-    right: var(--lyrics-theme-color-cycle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5))) !important;
+    right: var(--lyrics-theme-color-cycle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6))) !important;
     transform: none !important;
   }
 
@@ -239,6 +260,7 @@
   #lyrics-display-mode-toggle,
   #lyrics-font-weight-toggle,
   #lyrics-background-toggle,
+  #lyrics-translation-toggle,
   #lyrics-dynamic-theme-toggle,
   #lyrics-theme-color-cycle,
   #lyrics-theme-color-picker {
@@ -251,6 +273,7 @@
   #lyrics-display-mode-toggle svg,
   #lyrics-font-weight-toggle svg,
   #lyrics-background-toggle svg,
+  #lyrics-translation-toggle svg,
   #lyrics-dynamic-theme-toggle svg,
   #lyrics-theme-color-cycle svg,
   #lyrics-theme-color-picker svg {
@@ -437,6 +460,7 @@
 #lyrics-display-mode-toggle,
 #lyrics-font-weight-toggle,
 #lyrics-background-toggle,
+#lyrics-translation-toggle,
 #lyrics-dynamic-theme-toggle,
 #lyrics-theme-color-cycle,
 #lyrics-theme-color-picker {
@@ -499,6 +523,7 @@
 #lyrics-display-mode-toggle:hover .lyrics-btn-label,
 #lyrics-font-weight-toggle:hover .lyrics-btn-label,
 #lyrics-background-toggle:hover .lyrics-btn-label,
+#lyrics-translation-toggle:hover .lyrics-btn-label,
 #lyrics-dynamic-theme-toggle:hover .lyrics-btn-label,
 #lyrics-theme-color-cycle:hover .lyrics-btn-label,
 #lyrics-theme-color-picker:hover .lyrics-btn-label {
@@ -511,6 +536,7 @@
 #lyrics-display-mode-toggle svg,
 #lyrics-font-weight-toggle svg,
 #lyrics-background-toggle svg,
+#lyrics-translation-toggle svg,
 #lyrics-dynamic-theme-toggle svg,
 #lyrics-theme-color-cycle svg,
 #lyrics-theme-color-picker svg {
@@ -578,13 +604,18 @@
   right: auto;
 }
 
+#lyrics-width-control:not(.position-right) #lyrics-translation-toggle {
+  left: var(--lyrics-translation-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)));
+  right: auto;
+}
+
 #lyrics-width-control:not(.position-right) #lyrics-dynamic-theme-toggle {
-  left: var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)));
+  left: var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)));
   right: auto;
 }
 
 #lyrics-width-control:not(.position-right) #lyrics-theme-color-cycle {
-  left: var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)));
+  left: var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)));
   right: auto;
 }
 
@@ -619,14 +650,19 @@
   right: var(--lyrics-background-toggle-right, calc(var(--lyrics-position-toggle-width) + var(--lyrics-toggle-gap)));
 }
 
+#lyrics-width-control.position-right #lyrics-translation-toggle {
+  left: auto;
+  right: var(--lyrics-translation-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)));
+}
+
 #lyrics-width-control.position-right #lyrics-dynamic-theme-toggle {
   left: auto;
-  right: var(--lyrics-dynamic-theme-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)));
+  right: var(--lyrics-dynamic-theme-toggle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)));
 }
 
 #lyrics-width-control.position-right #lyrics-theme-color-cycle {
   left: auto;
-  right: var(--lyrics-theme-color-cycle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)));
+  right: var(--lyrics-theme-color-cycle-right, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)));
 }
 
 #lyrics-width-control.position-right #lyrics-theme-color-picker {
@@ -661,10 +697,19 @@
   transform: none;
 }
 
+#lyrics-width-control.position-center #lyrics-translation-toggle {
+  left: calc(
+    50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
+    var(--lyrics-translation-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)))
+  );
+  right: auto;
+  transform: none;
+}
+
 #lyrics-width-control.position-center #lyrics-dynamic-theme-toggle {
   left: calc(
     50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
-    var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 4)))
+    var(--lyrics-dynamic-theme-toggle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)))
   );
   right: auto;
   transform: none;
@@ -673,7 +718,7 @@
 #lyrics-width-control.position-center #lyrics-theme-color-cycle {
   left: calc(
     50% - (var(--lyrics-control-buttons-width, 0px) / 2) +
-    var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 5)))
+    var(--lyrics-theme-color-cycle-left, calc(var(--lyrics-position-toggle-width) + (var(--lyrics-toggle-gap) * 6)))
   );
   right: auto;
   transform: none;
@@ -692,6 +737,7 @@
 #lyrics-display-mode-toggle:hover,
 #lyrics-font-weight-toggle:hover,
 #lyrics-background-toggle:hover,
+#lyrics-translation-toggle:hover,
 #lyrics-theme-color-cycle:hover,
 #lyrics-theme-color-picker:hover {
   background: rgba(58, 58, 58, 0.95);
@@ -705,6 +751,7 @@
 #lyrics-display-mode-toggle:active,
 #lyrics-font-weight-toggle:active,
 #lyrics-background-toggle:active,
+#lyrics-translation-toggle:active,
 #lyrics-theme-color-cycle:active,
 #lyrics-theme-color-picker:active {
   background: rgba(235, 235, 235, 0.96);

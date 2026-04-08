@@ -377,6 +377,57 @@ export function addRomanizedText(lineElement, romanizedText) {
     }
 }
 
+export function addLyricTranslation(lineElement, translationText) {
+    const existing = lineElement.querySelector('.lyric-translation');
+    if (existing) {
+        existing.remove();
+    }
+
+    const translationSpan = document.createElement('span');
+    translationSpan.className = 'lyric-translation';
+    const parts = String(translationText || '').split(/(\s+)/).filter(p => p.length > 0);
+    const wordParts = parts.filter(part => !/^\s+$/.test(part));
+    const staggerSeconds = getWordStaggerSeconds(wordParts.length, { romanized: true });
+
+    if (wordParts.length === 0) {
+        return;
+    }
+
+    parts.forEach(part => {
+        if (/^\s+$/.test(part)) {
+            translationSpan.appendChild(document.createTextNode(part));
+        } else {
+            const w = document.createElement('span');
+            w.className = 'lyric-word translation-word';
+            const wordIndex = translationSpan.querySelectorAll('.translation-word').length;
+            const delay = wordIndex * staggerSeconds;
+            w.style.transitionDelay = `${delay}s`;
+            w.style.animationDelay = `${delay}s`;
+            w.textContent = part;
+            translationSpan.appendChild(w);
+        }
+    });
+
+    const wordContainer = lineElement.querySelector('.lyric-words');
+    const romanized = lineElement.querySelector('.romanized');
+    if (romanized && romanized.parentNode) {
+        romanized.parentNode.insertBefore(translationSpan, romanized.nextSibling);
+        return;
+    }
+
+    if (wordContainer && wordContainer.parentNode) {
+        wordContainer.parentNode.insertBefore(translationSpan, wordContainer);
+        return;
+    }
+
+    const textLyrics = lineElement.querySelector('.text-lyrics');
+    if (textLyrics) {
+        textLyrics.insertBefore(translationSpan, textLyrics.firstChild);
+    } else {
+        lineElement.insertBefore(translationSpan, lineElement.firstChild);
+    }
+}
+
 // Lyrics fetching
 export async function fetchLyrics(artist, title, album = '', duration = 0, onSuccess, onError) {
     const normalizeVideoId = (v) => (v === undefined || v === null) ? '' : String(v).trim();
@@ -723,7 +774,13 @@ export function getLyricLineRelation(currentIndex, lineIndex) {
 // Shared lyrics rendering (used by scripts/main.js and scripts/lyrics.js)
 // ------------------------------------------------------------
 
-function buildWordAnimatedLine(text, { index = 0, needsRomanization = false, isMusicNote = false, prefetchedRomanized = '' } = {}) {
+function buildWordAnimatedLine(text, {
+    index = 0,
+    needsRomanization = false,
+    isMusicNote = false,
+    prefetchedRomanized = '',
+    prefetchedTranslation = ''
+} = {}) {
     const div = document.createElement('div');
     div.className = 'lyric-line synced-line';
     div.dataset.index = index;
@@ -772,6 +829,15 @@ function buildWordAnimatedLine(text, { index = 0, needsRomanization = false, isM
         && prefetchedRomanized.trim() !== (text || '').toString().trim()
     ) {
         addRomanizedText(div, prefetchedRomanized);
+    }
+
+    if (
+        needsRomanization
+        && prefetchedTranslation
+        && prefetchedTranslation.trim()
+        && prefetchedTranslation.trim() !== (text || '').toString().trim()
+    ) {
+        addLyricTranslation(div, prefetchedTranslation);
     }
 
     return div;
@@ -1212,6 +1278,7 @@ animateOutLyrics().then(() => {
         }
         const syncedSource = data?.syncLyrics || data?.syncedLyrics || data?.synced;
         const romanizedSyncedSource = data?.romanizedSyncedLyrics || data?.romanizedSyncLyrics || null;
+        const translatedSyncedSource = data?.translatedSyncedLyrics || data?.englishSyncedLyrics || null;
         const plainText = getPlainTextFromLyricsPayload(data);
         const romanizedPlainText = (typeof data?.romanizedPlainLyrics === 'string') ? data.romanizedPlainLyrics : '';
 
@@ -1235,12 +1302,25 @@ animateOutLyrics().then(() => {
                     });
                     return map;
                 })();
+                const translatedBySourceIndex = (() => {
+                    if (!Array.isArray(translatedSyncedSource)) return null;
+                    const map = new Map();
+                    translatedSyncedSource.forEach((item, idx) => {
+                        const rawSourceIndex = Number(item?.sourceIndex);
+                        const key = Number.isFinite(rawSourceIndex) && rawSourceIndex >= 0 ? rawSourceIndex : idx;
+                        if (!map.has(key)) {
+                            map.set(key, (item?.text || '').toString());
+                        }
+                    });
+                    return map;
+                })();
 
                 state.currentLyrics.forEach((line, index) => {
                     const text = line?.isGhostLeadingSynthetic
                         ? ''
                         : (line?.text || MUSIC_NOTE_SYMBOL).toString();
                     let prefetchedRomanized = '';
+                    let prefetchedTranslation = '';
                     if (romanizedBySourceIndex) {
                         const sourceIndex = Number(line?.sourceIndex);
                         if (Number.isFinite(sourceIndex) && sourceIndex >= 0) {
@@ -1249,12 +1329,21 @@ animateOutLyrics().then(() => {
                             prefetchedRomanized = (romanizedBySourceIndex.get(index) || '').toString();
                         }
                     }
+                    if (translatedBySourceIndex) {
+                        const sourceIndex = Number(line?.sourceIndex);
+                        if (Number.isFinite(sourceIndex) && sourceIndex >= 0) {
+                            prefetchedTranslation = (translatedBySourceIndex.get(sourceIndex) || '').toString();
+                        } else {
+                            prefetchedTranslation = (translatedBySourceIndex.get(index) || '').toString();
+                        }
+                    }
                     const div = buildWordAnimatedLine(text, {
                         index,
                         needsRomanization: isNonLatin(text),
                         isMusicNote: !line?.isGhostLeadingSynthetic
                             && ((text.trim() === MUSIC_NOTE_SYMBOL) || !!line?.isEmpty),
-                        prefetchedRomanized
+                        prefetchedRomanized,
+                        prefetchedTranslation
                     });
                     if (line?.isGhostLeadingSynthetic) {
                         div.classList.add('leading-ghost-line');

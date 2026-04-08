@@ -6,6 +6,7 @@
   --lyric-font-size: clamp(16px, 1.146vw, 56px);
   --lyric-line-height: clamp(14px, 1.042vw, 52px);
   --lyric-romanized-size: clamp(1px, 0.5vw, 20px);
+  --lyric-translation-size: clamp(18px, 0.92vw, 36px);
 }
 
 /* Moved from <style> block in index.html */
