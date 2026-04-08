@@ -247,6 +247,12 @@ export function initLyricControlPanel(deps = {}) {
     const defaultAutoHideDelayMs = Number.isFinite(deps.autoHideDelayMs)
         ? deps.autoHideDelayMs
         : (isMobileTapMode ? 3000 : 1000);
+    const hoverIdleHideDelayMs = Number.isFinite(deps.hoverIdleHideDelayMs)
+        ? deps.hoverIdleHideDelayMs
+        : defaultAutoHideDelayMs;
+    const hoverRevealEnabled = deps.hoverRevealEnabled !== false;
+    const wheelRevealEnabled = deps.wheelRevealEnabled !== false;
+    const tapRevealEnabled = deps.tapRevealEnabled !== false;
     const syncScrollHintCopy = () => {
         if (!scrollHint) return;
         const leadingText = scrollHint.querySelector('.lyrics-scroll-hint-text');
@@ -262,6 +268,7 @@ export function initLyricControlPanel(deps = {}) {
 
     // Internal state mirrors old implementations.
     let autoHideTimeout = null;
+    let hoverIdleTimeout = null;
     let isWidthShortcutHeld = false;
     let isWidthControlHovered = false;
     let lyricsWidthDragActive = false;
@@ -274,7 +281,13 @@ export function initLyricControlPanel(deps = {}) {
         autoHideTimeout = null;
     };
 
+    const clearHoverIdleHide = () => {
+        if (hoverIdleTimeout) clearTimeout(hoverIdleTimeout);
+        hoverIdleTimeout = null;
+    };
+
     const hideControls = () => {
+        clearHoverIdleHide();
         setWidthControlVisible(false);
         if (setCloseWindowButtonVisible) setCloseWindowButtonVisible(false);
         syncScrollHintVisibility();
@@ -302,6 +315,17 @@ export function initLyricControlPanel(deps = {}) {
         autoHideTimeout = setTimeout(() => {
             autoHideTimeout = null;
             if (!isWidthShortcutHeld && !isWidthControlHovered && !isLyricsWindowHovered && !lyricsWidthDragActive) {
+                hideControls();
+            }
+        }, delayMs);
+    };
+
+    const scheduleHoverIdleHide = (delayMs = hoverIdleHideDelayMs) => {
+        if (!hoverRevealEnabled) return;
+        clearHoverIdleHide();
+        hoverIdleTimeout = setTimeout(() => {
+            hoverIdleTimeout = null;
+            if (!isWidthShortcutHeld && !lyricsWidthDragActive) {
                 hideControls();
             }
         }, delayMs);
@@ -506,23 +530,41 @@ export function initLyricControlPanel(deps = {}) {
     widthControl.addEventListener('pointerenter', () => {
         isWidthControlHovered = true;
         clearAutoHide();
+        scheduleHoverIdleHide();
+    });
+    widthControl.addEventListener('pointermove', () => {
+        isWidthControlHovered = true;
+        clearAutoHide();
+        scheduleHoverIdleHide();
     });
     widthControl.addEventListener('pointerleave', () => {
         isWidthControlHovered = false;
         if (!lyricsWidthDragActive) scheduleAutoHide(1000);
     });
 
-    // Keep controls visible while the pointer is inside the layout container.
-    const onLyricsWindowEnter = () => {
-        if (isLyricsWindowHovered) return;
+    // Keep controls visible while hover is active, but hide again after an idle timeout.
+    const onLyricsWindowHoverActivity = () => {
+        if (!hoverRevealEnabled) return;
         isLyricsWindowHovered = true;
         clearAutoHide();
         showControls();
+        scheduleHoverIdleHide();
+    };
+
+    const onLyricsWindowEnter = () => {
+        if (!hoverRevealEnabled) return;
+        if (isLyricsWindowHovered) {
+            scheduleHoverIdleHide();
+            return;
+        }
+        onLyricsWindowHoverActivity();
     };
 
     const onLyricsWindowLeave = () => {
+        if (!hoverRevealEnabled) return;
         if (!isLyricsWindowHovered) return;
         isLyricsWindowHovered = false;
+        clearHoverIdleHide();
         // If the pointer is leaving the whole app area, delay slightly before hiding.
         if (!isWidthControlHovered && !lyricsWidthDragActive && !isWidthShortcutHeld) {
             scheduleAutoHide(1000);
@@ -578,8 +620,10 @@ export function initLyricControlPanel(deps = {}) {
             if (!swipeActive && shouldStartSwipe) {
                 swipeActive = true;
                 swipeLastFontStepY = tapStartY;
-                showControls();
-                scheduleAutoHide(3000);
+                if (tapRevealEnabled) {
+                    showControls();
+                    scheduleAutoHide(3000);
+                }
             }
 
             if (!swipeActive || typeof deps.onLyricsWheel !== 'function') return;
@@ -604,6 +648,7 @@ export function initLyricControlPanel(deps = {}) {
             swipeLastFontStepY = 0;
             pointerActiveInBounds = false;
             if (!shouldToggle || !shouldHandleTap) return;
+            if (!tapRevealEnabled) return;
             const isVisible = widthControl.classList.contains('show');
             if (isVisible) {
                 clearAutoHide();
@@ -624,7 +669,7 @@ export function initLyricControlPanel(deps = {}) {
                 pointerActiveInBounds = false;
             }
         }, { passive: true, capture: true });
-    } else if (hoverBoundsElement) {
+    } else if (hoverRevealEnabled && hoverBoundsElement) {
         const isPointWithinRect = (x, y, rect) => (
             rect
             && x >= rect.left
@@ -636,7 +681,7 @@ export function initLyricControlPanel(deps = {}) {
         window.addEventListener('pointermove', (event) => {
             const rect = hoverBoundsElement.getBoundingClientRect();
             if (isPointWithinRect(event.clientX, event.clientY, rect)) {
-                onLyricsWindowEnter();
+                onLyricsWindowHoverActivity();
             } else {
                 onLyricsWindowLeave();
             }
@@ -644,7 +689,7 @@ export function initLyricControlPanel(deps = {}) {
 
         hoverBoundsElement.addEventListener('pointerenter', onLyricsWindowEnter);
         hoverBoundsElement.addEventListener('pointerleave', onLyricsWindowLeave);
-    } else {
+    } else if (hoverRevealEnabled) {
         // Fallback for pages without #layout-container.
         document.addEventListener('pointermove', onLyricsWindowEnter, true);
         document.addEventListener('pointerenter', onLyricsWindowEnter, true);
@@ -664,6 +709,7 @@ export function initLyricControlPanel(deps = {}) {
     const clearUi = () => {
         pressedCodes = new Set();
         isWidthShortcutHeld = false;
+        clearHoverIdleHide();
         hideControls();
     };
 
@@ -703,9 +749,10 @@ export function initLyricControlPanel(deps = {}) {
             event.stopPropagation();
 
             const delta = event.deltaY || event.detail || -event.wheelDelta;
-            // Show controls on wheel, like the welcome page behavior.
-            showControls();
-            scheduleAutoHide();
+            if (wheelRevealEnabled) {
+                showControls();
+                scheduleAutoHide();
+            }
 
             const layoutContainer = document.getElementById('layout-container');
             if (layoutContainer) {

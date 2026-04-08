@@ -519,14 +519,14 @@
   content: none;
 }
 
-#lyrics-position-toggle:hover .lyrics-btn-label,
-#lyrics-display-mode-toggle:hover .lyrics-btn-label,
-#lyrics-font-weight-toggle:hover .lyrics-btn-label,
-#lyrics-background-toggle:hover .lyrics-btn-label,
-#lyrics-translation-toggle:hover .lyrics-btn-label,
-#lyrics-dynamic-theme-toggle:hover .lyrics-btn-label,
-#lyrics-theme-color-cycle:hover .lyrics-btn-label,
-#lyrics-theme-color-picker:hover .lyrics-btn-label {
+body:not(.welcome-hotkey-only-controls) #lyrics-position-toggle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-display-mode-toggle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-font-weight-toggle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-background-toggle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-translation-toggle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-dynamic-theme-toggle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-theme-color-cycle:hover .lyrics-btn-label,
+body:not(.welcome-hotkey-only-controls) #lyrics-theme-color-picker:hover .lyrics-btn-label {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }

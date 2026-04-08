@@ -1259,6 +1259,10 @@ function hideWelcomeControllerUi() {
     setCloseWindowButtonVisible(false);
 }
 
+function enableWelcomeHotkeyOnlyLyricControls() {
+    document.body.classList.add('welcome-hotkey-only-controls');
+}
+
 function scheduleWidthControlAutoHide(delayMs = 1000) {
     if (widthControlAutoHideTimeout) { clearTimeout(widthControlAutoHideTimeout); widthControlAutoHideTimeout = null; }
     widthControlAutoHideTimeout = setTimeout(() => {
@@ -1712,6 +1716,7 @@ async function init() {
         runWelcomeInitStep('startProgressTracking', startProgressTracking);
 
         runWelcomeInitStep('applySavedSettings', applySavedSettings);
+        runWelcomeInitStep('enableWelcomeHotkeyOnlyLyricControls', enableWelcomeHotkeyOnlyLyricControls);
         runWelcomeInitStep('initLyricDynamicTheme', initLyricDynamicTheme);
         runWelcomeInitStep('initializePositionToggle', initializePositionToggle);
         runWelcomeInitStep('initializeLyricsClickabilityToggle', initializeLyricsClickabilityToggle);
@@ -1744,6 +1749,9 @@ async function init() {
             // Scroll/hotkey
             isDownloadMobilePreview,
             onLyricsWheel: (delta) => onLyricControlWheel(delta),
+            hoverRevealEnabled: false,
+            wheelRevealEnabled: false,
+            tapRevealEnabled: false,
 
             // Labels
             updateAllLabels: updateAllLyricControlLabels

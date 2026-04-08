@@ -3,7 +3,7 @@
 const STEPS = ['splash','shortcut','font-size','width','mode','position','close','tray'];
 const HOTKEY_GATED_STEPS = new Set(['shortcut', 'font-size', 'width', 'mode', 'position', 'close']);
 const SPLASH_AUTO_START_MS = 3000;
-const TRAY_SKIP_MS = 3000;
+const TRAY_SKIP_MS = 5000;
 const EXIT_FADE_MS = 260;
 let step = 0;
 let shortcutDone = false;
