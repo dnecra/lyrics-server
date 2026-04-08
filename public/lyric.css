@@ -65,7 +65,8 @@ html {
   opacity: 1;
   min-height: var(--lyric-line-height, 32px);
   overflow: visible;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   pointer-events: auto;
   cursor: default;
   filter: blur(var(--lyrics-inactive-blur));
@@ -177,6 +178,7 @@ html {
   position: relative;
   line-height: inherit;
   vertical-align: top;
+  white-space: nowrap;
   padding: 0 var(--lyrics-text-bg-inset);
   border-radius: 0.15em;
   background-color: transparent !important;
@@ -188,6 +190,18 @@ html {
   transition-duration: var(--lyrics-opacity-transition);
   transition-timing-function: ease-out;
   transition-delay: 0s;
+}
+
+.lyric-words,
+.lyric-line .romanized,
+.lyric-line .lyric-translation {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.lyric-line .romanized-word,
+.lyric-line .translation-word {
+  white-space: nowrap;
 }
 
 /* backdrop pseudo-element (keeps bg behind text on line-wrap) */
@@ -234,10 +248,10 @@ html {
   display: block;
   order: 1;
   font-family: inherit;
-  font-size: calc(var(--lyric-font-size, 27px) * 0.25);
+  font-size: calc(var(--lyric-font-size, 27px) * 0.4);
   line-height: 1.14;
-  font-weight: 800 !important;
-  font-variation-settings: "wght" 800;
+  font-weight: calc(var(--lyrics-inactive-font-weight) - 400) !important;
+  font-variation-settings: "wght" calc(var(--lyrics-inactive-font-weight) - 400);
   letter-spacing: 0.01em;
   opacity: calc(var(--lyrics-inactive-opacity) * 0.92);
   color: color-mix(in srgb, currentColor 88%, white 12%);
@@ -268,8 +282,8 @@ html {
 
 .lyric-line .lyric-translation .translation-word {
   font-size: inherit !important;
-  font-weight: 400 !important;
-  font-variation-settings: "wght" 400;
+  font-weight: inherit !important;
+  font-variation-settings: inherit;
   line-height: inherit !important;
 }
 
@@ -295,13 +309,13 @@ html {
 
 .lyric-line.current .lyric-translation {
   opacity: calc(var(--lyrics-active-opacity) * 0.78);
-  font-weight: 400 !important;
-  font-variation-settings: "wght" 400;
+  font-weight: calc(var(--lyrics-active-font-weight) - 400) !important;
+  font-variation-settings: "wght" calc(var(--lyrics-active-font-weight) - 400);
 }
 
 .lyric-line.current .lyric-translation .translation-word {
-  font-weight: 400 !important;
-  font-variation-settings: "wght" 400;
+  font-weight: inherit !important;
+  font-variation-settings: inherit;
 }
 
 .lyric-line.current .lyric-word,

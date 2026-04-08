@@ -858,7 +858,7 @@ body.window-resizing #close-window-control {
 /* Scroll mode needs a real scroll container so JS can keep active line centered. */
 #lyrics-container.scroll-line-mode {
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -1064,11 +1064,17 @@ body.window-resizing #close-window-control {
 
 #lyrics-container,
 #lyrics-container * {
+  overflow: visible;
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+}
+
+#lyrics-container.scroll-line-mode {
+  overflow-y: auto;
+  overflow-x: visible;
 }
 
 #synced-lyrics,

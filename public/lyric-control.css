@@ -547,6 +547,11 @@
   pointer-events: none;
 }
 
+#lyrics-translation-toggle svg {
+  transform: scale(0.84);
+  transform-origin: center;
+}
+
 #lyrics-theme-color-cycle {
   border-color: rgba(255, 255, 255, 0.3);
 }

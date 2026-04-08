@@ -102,6 +102,26 @@ let DUMMY_ROMANIZED_SYNCED = [
     { text: '' },
 ];
 
+let DUMMY_TRANSLATED_SYNCED = [
+    { text: 'lorem ipsum dolor sit amet' },
+    { text: 'consectetur adipiscing elit' },
+    { text: 'sed do eiusmod tempor' },
+    { text: 'incididunt ut labore et dolore' },
+    { text: 'magna aliqua enim ad minim' },
+    { text: 'veniam quis nostrud exercitation' },
+    { text: 'ullamco laboris nisi ut aliquip' },
+    { text: 'ex ea commodo consequat' },
+    { text: 'duis aute irure dolor in reprehenderit' },
+    { text: 'voluptate velit esse cillum' },
+    { text: 'dolore eu fugiat nulla pariatur' },
+    { text: 'excepteur sint occaecat cupidatat' },
+    { text: 'non proident sunt in culpa' },
+    { text: 'qui officia deserunt mollit anim id' },
+    { text: 'est laborum nisi ut aliquip' },
+    { text: 'ex ea commodo qua praesent' },
+    { text: '' },
+];
+
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 window.__lyricsBlankCutoffEnabled = true;
@@ -387,7 +407,7 @@ let currentLyricFontSize = DEFAULT_FONT_SIZE;
 let lowResLyricFontSizeOffset = 0;
 let currentLyricFontWeightPreset = 'regular';
 let currentLyricBackgroundPreset = DEFAULT_LYRIC_BACKGROUND_PRESET;
-let currentLyricRomanizationMode = 'romanized';
+let currentLyricRomanizationMode = 'both';
 const lyricControlLabelTouched = {
     mode: false,
     font: false,
@@ -551,7 +571,10 @@ function bootstrapStaticSong() {
 
     displayLyricsUI(
         { syncedLyrics: DUMMY_SYNCED_LYRICS, syncLyrics: DUMMY_SYNCED_LYRICS,
-          plainLyrics: DUMMY_PLAIN_LYRICS, romanizedSyncedLyrics: DUMMY_ROMANIZED_SYNCED, romanizedPlainLyrics: '' },
+          plainLyrics: DUMMY_PLAIN_LYRICS,
+          romanizedSyncedLyrics: DUMMY_ROMANIZED_SYNCED,
+          translatedSyncedLyrics: DUMMY_TRANSLATED_SYNCED,
+          romanizedPlainLyrics: '' },
         { fetchVideoId: DUMMY_VIDEO_ID, validateFetch: () => true, logTag: 'WELCOME-STATIC' }
     );
 
@@ -766,9 +789,9 @@ function normalizeLyricBackgroundPreset(preset) {
 }
 
 function normalizeLyricRomanizationMode(mode) {
-    if (typeof mode !== 'string') return 'romanized';
+    if (typeof mode !== 'string') return 'both';
     const normalized = mode.trim().toLowerCase();
-    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'romanized';
+    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'both';
 }
 
 function applyLyricRomanizationMode(mode, { persist = true } = {}) {
@@ -947,7 +970,7 @@ function updateLyricsTranslationToggleLabel() {
     const mode = normalizeLyricRomanizationMode(currentLyricRomanizationMode);
     const labelMap = {
         romanized: 'Romanized',
-        both: 'Both',
+        both: 'Translated',
         off: 'Off'
     };
     const titleMap = {
@@ -955,7 +978,7 @@ function updateLyricsTranslationToggleLabel() {
         both: 'Romanization + Translation: On',
         off: 'Romanization + Translation: Off'
     };
-    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanize');
+    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanization');
     btn.setAttribute('aria-label', `Cycle lyric romanization mode (current: ${labelMap[mode]})`);
     btn.setAttribute('title', titleMap[mode]);
     syncWidthControlButtonMetrics();
@@ -1303,7 +1326,7 @@ function applySavedSettings() {
         applyLyricFontWeightPreset(settings.lyricFontWeightPreset || 'regular', { persist: false });
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
         const savedRomanizationMode = settings.lyricRomanizationMode
-            || (settings.lyricTranslationEnabled === true ? 'both' : 'romanized');
+            || (settings.lyricTranslationEnabled === true ? 'both' : 'both');
         applyLyricRomanizationMode(savedRomanizationMode, { persist: false });
         syncWidthControlPositionClass(); updateLyricsPositionToggleLabel(); applyLyricsContainerClickability();
     } else {
@@ -1319,7 +1342,7 @@ function applySavedSettings() {
         applyLyricsDisplayMode(isPhoneLayoutEnvironment() ? 'scroll' : DEFAULT_LYRIC_DISPLAY_MODE, { persist: false, refresh: false });
         applyLyricFontWeightPreset('regular', { persist: false });
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
-        applyLyricRomanizationMode('romanized', { persist: false });
+        applyLyricRomanizationMode('both', { persist: false });
     }
     applyLyricSizing();
 }

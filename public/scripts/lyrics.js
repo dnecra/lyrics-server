@@ -1,7 +1,7 @@
 import { API_URL, state, resetSongState } from './modules/config.js';
 import { initWebSocket } from './modules/connection.js';
 import { ensureLyricsSongInfoVisible, updateNowPlayingFromData } from './modules/now-playing.js';
-import { updateLyricsDisplay, displayLyricsUI, hideLyricsUI, getLyricDisplayMode, setLyricDisplayMode, centerActiveLyricLineStrict } from './modules/lyric.js';
+import { fetchLyrics, updateLyricsDisplay, displayLyricsUI, hideLyricsUI, getLyricDisplayMode, setLyricDisplayMode, centerActiveLyricLineStrict } from './modules/lyric.js';
 import {
     initLyricDynamicTheme,
     getLyricDynamicThemeEnabled,
@@ -323,7 +323,7 @@ let currentLyricFontSize = DEFAULT_FONT_SIZE;
 let lowResLyricFontSizeOffset = 0;
 let currentLyricFontWeightPreset = DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET;
 let currentLyricBackgroundPreset = DEFAULT_LYRIC_BACKGROUND_PRESET;
-let currentLyricRomanizationMode = 'romanized';
+let currentLyricRomanizationMode = 'both';
 const lyricControlLabelTouched = {
     mode: false,
     font: false,
@@ -353,6 +353,8 @@ let wheelResizeFreezeTimeout = null;
 let applyLyricSizingRaf = null;
 let windowResizeRaf = null;
 let windowResizeSettleTimeout = null;
+let deferredScrollCenterTimeout = null;
+let revealScrollCenterToken = 0;
 let configuredLyricsMinWidthVwCache = null;
 let configuredLyricsMaxWidthVwCache = null;
 const WHEEL_RESIZE_ACTIVE_LINE_FREEZE_MS = 650;
@@ -604,6 +606,56 @@ function scheduleViewportSyncAndRecenter() {
     viewportSyncTimeout = setTimeout(() => {
         runViewportSyncAndRecenter();
     }, 16);
+}
+
+function centerCurrentScrollModeActiveLine({ behavior = 'instant' } = {}) {
+    if (getLyricDisplayMode() !== 'scroll') return;
+    const lyricsContainer = document.getElementById('lyrics-container');
+    const activeIndex = captureCurrentActiveLyricIndex();
+    if (!lyricsContainer || activeIndex < 0) return;
+    centerActiveLyricLineStrict(activeIndex, lyricsContainer, { behavior });
+}
+
+function scheduleDeferredScrollCenter(delayMs = 0) {
+    if (deferredScrollCenterTimeout) {
+        clearTimeout(deferredScrollCenterTimeout);
+        deferredScrollCenterTimeout = null;
+    }
+    deferredScrollCenterTimeout = setTimeout(() => {
+        deferredScrollCenterTimeout = null;
+        scheduleViewportSync();
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                centerCurrentScrollModeActiveLine({ behavior: 'instant' });
+            });
+        });
+    }, Math.max(0, Number(delayMs) || 0));
+}
+
+function scheduleScrollCenterAfterReveal() {
+    const token = ++revealScrollCenterToken;
+    const containers = ['synced-lyrics', 'plain-lyrics']
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+    if (containers.length === 0) return;
+
+    let finished = false;
+    const cleanup = () => {
+        containers.forEach((el) => el.removeEventListener('transitionend', onTransitionEnd));
+    };
+    const done = () => {
+        if (finished || token !== revealScrollCenterToken) return;
+        finished = true;
+        cleanup();
+        scheduleDeferredScrollCenter(0);
+    };
+    const onTransitionEnd = (event) => {
+        if (event?.propertyName && event.propertyName !== 'transform') return;
+        done();
+    };
+
+    containers.forEach((el) => el.addEventListener('transitionend', onTransitionEnd));
+    scheduleDeferredScrollCenter(1100);
 }
 
 function getLyricsScrollContainer() {
@@ -1033,9 +1085,9 @@ function normalizeLyricBackgroundPreset(preset) {
 }
 
 function normalizeLyricRomanizationMode(mode) {
-    if (typeof mode !== 'string') return 'romanized';
+    if (typeof mode !== 'string') return 'both';
     const normalized = mode.trim().toLowerCase();
-    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'romanized';
+    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'both';
 }
 
 function applyLyricRomanizationMode(mode, { persist = true } = {}) {
@@ -1233,7 +1285,7 @@ function updateLyricsTranslationToggleLabel() {
     const mode = normalizeLyricRomanizationMode(currentLyricRomanizationMode);
     const labelMap = {
         romanized: 'Romanized',
-        both: 'Both',
+        both: 'Translated',
         off: 'Off'
     };
     const titleMap = {
@@ -1241,7 +1293,7 @@ function updateLyricsTranslationToggleLabel() {
         both: 'Romanization + Translation: On',
         off: 'Romanization + Translation: Off'
     };
-    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanize');
+    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanization');
     btn.setAttribute('aria-label', `Cycle lyric romanization mode (current: ${labelMap[mode]})`);
     btn.setAttribute('title', titleMap[mode]);
     syncWidthControlButtonMetrics();
@@ -1396,6 +1448,9 @@ function applyLyricsDisplayMode(mode, { persist = true, refresh = true } = {}) {
     setLyricDisplayMode(normalized, { refresh });
     updateLyricsDisplayModeToggleLabel();
     scheduleViewportSyncAndRecenter();
+    if (normalized === 'scroll') {
+        scheduleDeferredScrollCenter(120);
+    }
     if (persist) saveSettings();
 }
 
@@ -1771,7 +1826,7 @@ function applySavedSettings() {
         applyLyricFontWeightPreset(settings.lyricFontWeightPreset || DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
         const savedRomanizationMode = settings.lyricRomanizationMode
-            || (settings.lyricTranslationEnabled === true ? 'both' : 'romanized');
+            || (settings.lyricTranslationEnabled === true ? 'both' : 'both');
         applyLyricRomanizationMode(savedRomanizationMode, { persist: false });
 
         syncWidthControlPositionClass();
@@ -1791,7 +1846,7 @@ function applySavedSettings() {
         });
         applyLyricFontWeightPreset(DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
-        applyLyricRomanizationMode('romanized', { persist: false });
+        applyLyricRomanizationMode('both', { persist: false });
     }
 
     applyLyricSizing();
@@ -2046,6 +2101,7 @@ function displayLyrics(data, fetchVideoId) {
         logTag: 'LYRICS'
     });
     requestAnimationFrame(() => runViewportSyncAndRecenter());
+    scheduleScrollCenterAfterReveal();
     return result;
 }
 
@@ -2055,6 +2111,31 @@ function hideLyrics() {
         logTag: 'LYRICS'
     });
     return result;
+}
+
+function retryRomanizationFetchIfMissing(reason = '') {
+    const songData = state.currentSongData;
+    const videoId = typeof songData?.videoId === 'string' ? songData.videoId.trim() : '';
+    const artist = typeof songData?.artist === 'string' ? songData.artist.trim() : '';
+    const title = typeof songData?.title === 'string' ? songData.title.trim() : '';
+    if (!videoId || !artist || !title) return;
+    if (state.currentFetchVideoId === videoId) return;
+    if (state.lastFetchedVideoId !== videoId) return;
+    if (!Array.isArray(state.currentLyrics) || state.currentLyrics.length === 0) return;
+
+    const hasRomanizableLines = !!document.querySelector('#synced-lyrics .lyric-line.romanizable, #plain-lyrics .lyric-line.romanizable');
+    const hasRenderedRomanized = !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
+    if (!hasRomanizableLines || hasRenderedRomanized) return;
+
+    console.log(`[LYRICS] Re-fetching current song to recover missing romanized lyrics${reason ? ` (${reason})` : ''}`);
+    fetchLyrics(
+        artist,
+        title,
+        songData.album || '',
+        songData.songDuration || 0,
+        displayLyrics,
+        hideLyrics
+    );
 }
 
 function resolveInitialBootVisibility() {
@@ -2214,6 +2295,11 @@ async function init() {
         getLyricDynamicThemeEnabled,
         getMinLyricsWidthVw: (viewportWidth) => (viewportWidth <= 767 ? MIN_LYRICS_WIDTH_VW_LOW_RES : MIN_LYRICS_WIDTH_VW),
         applyLyricsMaxWidth,
+        onWidthDragUpdate: () => {
+            const anchor = captureActiveLyricAnchor();
+            const activeIndex = captureCurrentActiveLyricIndex();
+            scheduleWheelResizeAnchorRestore(anchor, activeIndex);
+        },
         scheduleViewportSync,
         scheduleViewportSyncAndRecenter,
 
@@ -2248,10 +2334,15 @@ async function init() {
         if (document.hidden) return;
         refreshSongStateFromServer();
         scheduleViewportSyncAndRecenter();
+        requestAnimationFrame(() => retryRomanizationFetchIfMissing('visibility-restore'));
     };
     document.addEventListener('visibilitychange', handleVisibilityRestore);
     window.addEventListener('focus', handleVisibilityRestore, { passive: true });
     window.addEventListener('pageshow', handleVisibilityRestore, { passive: true });
+    window.addEventListener('lyrics-ws-open', () => {
+        refreshSongStateFromServer();
+        requestAnimationFrame(() => retryRomanizationFetchIfMissing('ws-open'));
+    });
 
     
 

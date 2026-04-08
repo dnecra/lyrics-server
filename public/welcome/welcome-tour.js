@@ -3,7 +3,7 @@
 const STEPS = ['splash','shortcut','font-size','width','mode','position','close','tray'];
 const HOTKEY_GATED_STEPS = new Set(['shortcut', 'font-size', 'width', 'mode', 'position', 'close']);
 const SPLASH_AUTO_START_MS = 3000;
-const TRAY_AUTO_NEXT_MS = 5000;
+const TRAY_SKIP_MS = 3000;
 const EXIT_FADE_MS = 260;
 let step = 0;
 let shortcutDone = false;
@@ -14,8 +14,6 @@ let stepCleanup = null;
 const heldKeys = new Set();
 let hotkeyHeld = false;
 let windowPos = null; // shared position for all floating windows
-let skipButtonHiddenAfterCloseStep = false;
-let redirectInProgress = false;
 
 function ensureOrthoArrowMarkup(el) {
   if (!el) return;
@@ -80,6 +78,13 @@ function dismissWelcomeTour() {
   document.getElementById('wt-splash')?.remove();
   document.getElementById('skip-welcome-btn')?.remove();
   document.getElementById('close-dummy-control')?.remove();
+  const layoutContainer = document.getElementById('layout-container');
+  if (layoutContainer) {
+    layoutContainer.style.removeProperty('display');
+  }
+  if (typeof window.__welcomeHideControllerUi === 'function') {
+    window.__welcomeHideControllerUi();
+  }
   arrowEl?.remove();
   dim?.remove();
   row?.remove();
@@ -100,12 +105,12 @@ function startGraphicCountdown(el, durationMs) {
   };
 }
 
-function goToLyricsNow({ smooth = true } = {}) {
-  if (redirectInProgress) return;
-  redirectInProgress = true;
-  const target = 'http://localhost:1312/lyrics';
+function exitWelcomeTour({ smooth = true } = {}) {
+  const finish = () => {
+    dismissWelcomeTour();
+  };
   if (!smooth) {
-    window.location.replace(target);
+    finish();
     return;
   }
 
@@ -122,7 +127,7 @@ function goToLyricsNow({ smooth = true } = {}) {
     dim.style.transition = `opacity ${EXIT_FADE_MS}ms ease`;
     dim.style.opacity = '0';
   }
-  setTimeout(() => window.location.replace(target), EXIT_FADE_MS);
+  setTimeout(finish, EXIT_FADE_MS);
 }
 
 function ensureSkipGuideButton() {
@@ -136,7 +141,7 @@ function ensureSkipGuideButton() {
     btn.setAttribute('title', 'Skip guide');
     btn.setAttribute('data-label', 'Skip Guide');
     btn.innerHTML = '<span class="material-icons" aria-hidden="true">skip_next</span>';
-    btn.addEventListener('click', () => goToLyricsNow());
+    btn.addEventListener('click', () => exitWelcomeTour());
     document.body.appendChild(btn);
   }
   return btn;
@@ -168,8 +173,7 @@ function ensureDummyCloseButton() {
 function syncSkipButtonVisibility() {
   const btn = document.getElementById('skip-welcome-btn');
   if (!btn) return;
-  const shouldShow = !redirectInProgress && !skipButtonHiddenAfterCloseStep;
-  btn.classList.toggle('show', shouldShow);
+  btn.classList.add('show');
 }
 
 function kbFocus(on) {}
@@ -547,7 +551,7 @@ function doGoodbye() {}
   const clearCountdown = startGraphicCountdown(document.getElementById('wt-goodbye-timer'), GOODBYE_AUTO_NEXT_MS);
   setTimeout(() => {
     clearCountdown();
-    goToLyricsNow({ smooth: true });
+    exitWelcomeTour({ smooth: true });
   }, GOODBYE_AUTO_NEXT_MS);
 }
 
@@ -633,6 +637,7 @@ function doShortcut() {
     <div class="wt-step">1 / 6</div>
     <div class="wt-label">${guideWords('Press Alt+Shift+F')}</div>
     <div class="wt-desc">Press and <strong>hold</strong> <span class="wt-combo">Alt + Shift + F</span> to activate and show the Controller.</div>
+    <div class="wt-desc">Try clicking this window if shortcut not working</div>
   `, `<span class="wt-td" id="wt-td"></span><span id="wt-tl">Hold <span class="wt-keycap" data-hotkey="alt">Alt</span> <span class="wt-keycap" data-hotkey="shift">Shift</span> <span class="wt-keycap" data-hotkey="f">F</span></span>`);
   setHotkeyReminderVisible(true);
   syncHotkeyKeycaps();
@@ -856,7 +861,6 @@ function doCloseApp() {
     cleanupControlBar();
     cleanupCloseControl();
     stepCleanup = null;
-    skipButtonHiddenAfterCloseStep = true;
     const layoutContainer = document.getElementById('layout-container');
     if (layoutContainer) {
       layoutContainer.style.display = 'none';
@@ -891,40 +895,36 @@ function doTray() {
       </span>
     </div>
   `);
-  let advanced = false;
-  let autoNextTimer = null;
-  const clearCountdown = startGraphicCountdown(document.getElementById('wt-tray-timer'), TRAY_AUTO_NEXT_MS);
-  const advanceToLyrics = () => {
-    if (advanced) return;
-    advanced = true;
-    if (autoNextTimer) {
-      clearTimeout(autoNextTimer);
-      autoNextTimer = null;
+  let finished = false;
+  let autoSkipTimer = null;
+  const clearCountdown = startGraphicCountdown(document.getElementById('wt-tray-timer'), TRAY_SKIP_MS);
+  const finishTour = () => {
+    if (finished) return;
+    finished = true;
+    if (autoSkipTimer) {
+      clearTimeout(autoSkipTimer);
+      autoSkipTimer = null;
     }
     clearCountdown();
     row.classList.remove('tray-step');
-    goToLyricsNow({ smooth: true });
+    exitWelcomeTour({ smooth: true });
   };
   stepCleanup = () => {
-    if (autoNextTimer) {
-      clearTimeout(autoNextTimer);
-      autoNextTimer = null;
+    if (autoSkipTimer) {
+      clearTimeout(autoSkipTimer);
+      autoSkipTimer = null;
     }
     clearCountdown();
     row.classList.remove('tray-step');
     stepCleanup = null;
   };
-  autoNextTimer = setTimeout(() => {
-    if (typeof window.__wtDismissTrayScene === 'function') {
-      window.__wtDismissTrayScene();
-    } else {
-      advanceToLyrics();
-    }
-  }, TRAY_AUTO_NEXT_MS);
+  autoSkipTimer = setTimeout(() => {
+    document.getElementById('skip-welcome-btn')?.click();
+  }, TRAY_SKIP_MS);
 
   import('./welcome-tray-scene.js').then(({ mountTrayScene }) => {
     mountTrayScene(() => {
-      advanceToLyrics();
+      finishTour();
     });
   });
 }

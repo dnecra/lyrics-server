@@ -92,6 +92,46 @@ function normalizeSongText(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+function buildLyricsRequestKey(songData) {
+    if (!songData || !songData.videoId) return '';
+    return JSON.stringify([
+        String(songData.videoId).trim(),
+        normalizeSongText(songData.artist),
+        normalizeSongText(songData.title),
+        String(songData.album || '').trim(),
+        Number(songData.songDuration || 0) || 0
+    ]);
+}
+
+function requestLyricsIfReady(songData, onLyricsDisplay, onLyricsHide) {
+    const videoId = typeof songData?.videoId === 'string' ? songData.videoId.trim() : '';
+    const artist = normalizeSongText(songData?.artist);
+    const title = normalizeSongText(songData?.title);
+    if (!videoId || !artist || !title) return false;
+
+    const requestKey = buildLyricsRequestKey(songData);
+    const hasLyricsForCurrentSong =
+        state.currentVideoId === videoId &&
+        state.lastFetchedVideoId === videoId &&
+        Array.isArray(state.currentLyrics) &&
+        state.currentLyrics.length > 0;
+
+    if (hasLyricsForCurrentSong) return false;
+    if (state.currentFetchVideoId === videoId) return false;
+    if (state.lastLyricsRequestKey === requestKey) return false;
+
+    state.lastLyricsRequestKey = requestKey;
+    fetchLyrics(
+        artist,
+        title,
+        songData.album || '',
+        songData.songDuration || 0,
+        onLyricsDisplay,
+        onLyricsHide
+    );
+    return true;
+}
+
 function playSongInfoFadeIn(songInfoContent) {
     if (!songInfoContent || typeof songInfoContent.animate !== 'function') return;
     if (typeof songInfoContent.getAnimations === 'function') {
@@ -385,34 +425,13 @@ export async function updateNowPlayingFromData(data, handlers = {}) {
         if (plainEl) { plainEl.innerHTML = ''; plainEl.style.display = 'none'; }
         if (loadingEl) { loadingEl.style.display = ''; loadingEl.classList.add('active'); }
 
-        if (displayData.artist && displayData.title) {
-            fetchLyrics(
-                displayData.artist,
-                displayData.title,
-                displayData.album || '',
-                displayData.songDuration || 0,
-                onLyricsDisplay,
-                onLyricsHide
-            );
-        } else if (loadingEl) {
+        if (!requestLyricsIfReady(displayData, onLyricsDisplay, onLyricsHide) && loadingEl) {
             loadingEl.classList.remove('active');
         }
     } else if (
-        data.videoId &&
-        data.videoId !== state.lastFetchedVideoId &&
-        data.videoId !== state.currentFetchVideoId &&
-        displayData.artist &&
-        displayData.title
+        requestLyricsIfReady(displayData, onLyricsDisplay, onLyricsHide)
     ) {
         console.log('[LYRICS] Fetching lyrics for current song (mid-song load)');
-        fetchLyrics(
-            displayData.artist,
-            displayData.title,
-            displayData.album || '',
-            displayData.songDuration || 0,
-            onLyricsDisplay,
-            onLyricsHide
-        );
     } else if (incomingElapsed !== null) {
         syncPlaybackAnchor(data, nowMs);
     }

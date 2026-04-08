@@ -29,6 +29,11 @@ export function initWebSocket(messageHandler) {
                 reconnectTimeoutId = null;
             }
             if (logMessage) logMessage('Connected to server');
+            try {
+                window.dispatchEvent(new CustomEvent('lyrics-ws-open'));
+            } catch (_) {
+                // ignore environments without CustomEvent support
+            }
         };
 
         state.ws.onmessage = (event) => {

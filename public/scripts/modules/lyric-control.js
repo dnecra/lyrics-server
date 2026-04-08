@@ -483,7 +483,11 @@ export function initLyricControlPanel(deps = {}) {
                 : (pointerX - boundsLeft);
 
         deps.applyLyricsMaxWidth?.((widthPx / boundsWidth) * 100);
-        deps.scheduleViewportSync?.();
+        if (typeof deps.onWidthDragUpdate === 'function') {
+            deps.onWidthDragUpdate();
+        } else {
+            deps.scheduleViewportSync?.();
+        }
     };
 
     handles.forEach((handle) => {

@@ -10,6 +10,7 @@ export const state = {
     isSyncedLyrics: false,
     lastFetchedVideoId: null,
     currentFetchVideoId: null,
+    lastLyricsRequestKey: null,
     isPaused: false,
     currentSongData: null,
     currentPlayingIndex: null,
@@ -65,6 +66,7 @@ export function resetSongState() {
     state.lyricsOffset = 0;
     state.lastFetchedVideoId = null;
     state.currentFetchVideoId = null;
+    state.lastLyricsRequestKey = null;
     state.lastProgressUpdate = 0;
     state.lastServerProgressAt = 0;
     state.serverProgressBaseAt = 0;
