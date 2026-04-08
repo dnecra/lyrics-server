@@ -234,7 +234,7 @@ html {
   display: block;
   order: 1;
   font-family: inherit;
-  font-size: var(--lyric-translation-size, calc(var(--lyric-font-size, 27px) * 1.64));
+  font-size: calc(var(--lyric-font-size, 27px) * 0.25);
   line-height: 1.14;
   font-weight: 800 !important;
   font-variation-settings: "wght" 800;
