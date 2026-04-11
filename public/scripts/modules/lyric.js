@@ -8,9 +8,13 @@ const GAP_FILL_THRESHOLD_PER_WORD_SECONDS = 1;
 const FINAL_BLANK_MIN_GAP_SECONDS = 3;
 const FINAL_BLANK_TARGET_GAP_SECONDS = 5;
 const ACTIVE_LYRIC_TIME_OFFSET_SECONDS = 0;
+const AUTO_CENTER_LEAD_SECONDS = 0.12;
 const SYNCED_LYRIC_PARSE_OFFSET_SECONDS = 1.0;
 const LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS = 2.0;
 const AUTO_CENTER_TOLERANCE_PX = 3;
+const AUTO_CENTER_RETARGET_DEADZONE_PX = 2;
+const AUTO_CENTER_ANIMATION_DURATION_MS = 220;
+const AUTO_CENTER_ANIMATION_FAST_DURATION_MS = 120;
 let lyricLineElements = [];
 let lyricsRenderVersion = 0;
 let lastStableLyricEffectiveTime = null;
@@ -20,6 +24,7 @@ let currentLyricDisplayMode = 'scroll';
 let lastRenderedLyricDisplayMode = 'scroll';
 let compactNoLyricsLeavingTimer = null;
 let compactNoLyricsEnteringTimer = null;
+const activeScrollAnimations = new WeakMap();
 
 function setCompactNoLyricsState(enabled) {
     const body = document.body;
@@ -221,23 +226,87 @@ function getOffsetTopWithinContainer(element, container) {
     return element.offsetTop || 0;
 }
 
+function getStableCenterAnchor(lineElement) {
+    if (!lineElement) return null;
+    return lineElement.querySelector('.text-lyrics') || lineElement;
+}
+
+function getStableCenterTargetTop(lineElement, scrollContainer) {
+    if (!lineElement || !scrollContainer) return 0;
+
+    const anchorElement = getStableCenterAnchor(lineElement);
+    if (!anchorElement) return 0;
+
+    const anchorOffsetTop = getOffsetTopWithinContainer(anchorElement, scrollContainer);
+    const targetTop = anchorOffsetTop - (scrollContainer.clientHeight / 2);
+    const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+
+    return Math.max(0, Math.min(maxScrollTop, targetTop));
+}
+
 function smoothScrollContainerTo(container, targetTop, behavior = 'smooth') {
     if (!container) return;
     if (Math.abs((container.scrollTop || 0) - targetTop) <= AUTO_CENTER_TOLERANCE_PX) return;
 
     if (behavior !== 'smooth') {
+        const existingAnimation = activeScrollAnimations.get(container);
+        if (existingAnimation?.rafId) {
+            cancelAnimationFrame(existingAnimation.rafId);
+        }
+        activeScrollAnimations.delete(container);
         container.scrollTop = targetTop;
         return;
     }
 
-    try {
-        container.scrollTo({
-            top: targetTop,
-            behavior
-        });
-    } catch (_) {
-        container.scrollTop = targetTop;
+    const existingAnimation = activeScrollAnimations.get(container);
+    const existingTargetTop = Number(existingAnimation?.targetTop);
+    if (Number.isFinite(existingTargetTop) && Math.abs(existingTargetTop - targetTop) < AUTO_CENTER_RETARGET_DEADZONE_PX) {
+        return;
     }
+
+    if (existingAnimation?.rafId) {
+        cancelAnimationFrame(existingAnimation.rafId);
+    }
+
+    const startTop = Number(container.scrollTop) || 0;
+    const delta = targetTop - startTop;
+    if (Math.abs(delta) <= AUTO_CENTER_TOLERANCE_PX) {
+        activeScrollAnimations.delete(container);
+        container.scrollTop = targetTop;
+        return;
+    }
+
+    const durationMs = Math.abs(delta) >= 140
+        ? AUTO_CENTER_ANIMATION_FAST_DURATION_MS
+        : AUTO_CENTER_ANIMATION_DURATION_MS;
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+
+    const animationState = {
+        rafId: 0,
+        targetTop
+    };
+    activeScrollAnimations.set(container, animationState);
+
+    const startTime = performance.now();
+    const tick = (now) => {
+        const latestAnimation = activeScrollAnimations.get(container);
+        if (latestAnimation !== animationState) return;
+
+        const progress = Math.max(0, Math.min(1, (now - startTime) / durationMs));
+        const eased = easeOutCubic(progress);
+        container.scrollTop = startTop + (delta * eased);
+
+        if (progress >= 1) {
+            container.scrollTop = targetTop;
+            activeScrollAnimations.delete(container);
+            return;
+        }
+
+        animationState.rafId = requestAnimationFrame(tick);
+    };
+
+    // Start immediately so the motion does not feel delayed.
+    tick(startTime);
 }
 
 export function centerActiveLyricLineStrict(currentIndex, lyricsContainer, options = {}) {
@@ -252,14 +321,10 @@ export function centerActiveLyricLineStrict(currentIndex, lyricsContainer, optio
     const lineElement = lyricsContainer.querySelector(`.lyric-line[data-index="${currentIndex}"]`);
     if (!lineElement) return;
 
-    const lineOffsetTop = getOffsetTopWithinContainer(lineElement, scrollContainer);
-    const targetTop = lineOffsetTop - ((scrollContainer.clientHeight - lineElement.offsetHeight) / 2);
-    const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
-    const clampedTargetTop = Math.max(0, Math.min(maxScrollTop, targetTop));
+    const targetTop = getStableCenterTargetTop(lineElement, scrollContainer);
+    if (Math.abs(scrollContainer.scrollTop - targetTop) <= AUTO_CENTER_TOLERANCE_PX) return;
 
-    if (Math.abs(scrollContainer.scrollTop - clampedTargetTop) <= AUTO_CENTER_TOLERANCE_PX) return;
-
-    smoothScrollContainerTo(scrollContainer, clampedTargetTop, behavior);
+    smoothScrollContainerTo(scrollContainer, targetTop, behavior);
 }
 
 function getWordStaggerSeconds(wordCount, { romanized = false } = {}) {
@@ -295,6 +360,28 @@ function queueActivatingCurrentCleanup(lines) {
             }, 50);
         });
     });
+}
+
+function findCurrentLyricIndexAtTime(lines, time) {
+    if (!Array.isArray(lines) || lines.length === 0) return -1;
+    const safeTime = Math.max(0, Number(time) || 0);
+
+    let currentIndex = -1;
+    let lo = 0;
+    let hi = lines.length - 1;
+    while (lo <= hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        const midTime = Number(lines[mid]?.time);
+        const safeMidTime = Number.isFinite(midTime) ? midTime : 0;
+        if (safeMidTime <= safeTime) {
+            currentIndex = mid;
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+
+    return currentIndex;
 }
 
 function applyDynamicLineAnimationVars(lineElement, durationMs) {
@@ -596,22 +683,7 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     if (!state.currentLyrics || state.currentLyrics.length === 0) return;
 
     const lyricsLength = state.currentLyrics.length;
-    let currentIndex = -1;
-    if (lyricsLength > 0) {
-        let lo = 0;
-        let hi = lyricsLength - 1;
-        while (lo <= hi) {
-            const mid = Math.floor((lo + hi) / 2);
-            const midTime = Number(state.currentLyrics[mid]?.time);
-            const safeMidTime = Number.isFinite(midTime) ? midTime : 0;
-            if (safeMidTime <= effectiveTime) {
-                currentIndex = mid;
-                lo = mid + 1;
-            } else {
-                hi = mid - 1;
-            }
-        }
-    }
+    let currentIndex = findCurrentLyricIndexAtTime(state.currentLyrics, effectiveTime);
 
     // Keep the frontend-injected leading placeholder active from 0s until the
     // first actual lyric line starts, so the opening blank row never looks inactive.
@@ -706,7 +778,6 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     const shouldApplyBlankCutoff = isBlankCutoffEnabledForCurrentPage() && activeBlankCutoffIndex >= 0;
 
     if (hasActiveLineChanged || hasExpandedModeChanged || hasDisplayModeChanged) {
-        const activatingLines = [];
         lines.forEach((line, index) => {
             line.classList.remove('current', 'previous', 'upcoming', 'before', 'after', 'far-before', 'far-after', 'activating-current');
             line.classList.remove('hidden-after-blank', 'fixed-hidden', 'fixed-secondary');
@@ -721,8 +792,6 @@ export function updateLyricsDisplay(currentTime, options = {}) {
                 line.classList.add('current');
                 if (shouldAnimateActiveLine) {
                     applyActiveWordStagger(line);
-                    line.classList.add('activating-current');
-                    activatingLines.push(line);
                 }
             }
 
@@ -752,10 +821,6 @@ export function updateLyricsDisplay(currentTime, options = {}) {
             }
         });
 
-        if (activatingLines.length > 0) {
-            queueActivatingCurrentCleanup(activatingLines);
-        }
-
         if (displayMode !== 'scroll') {
             reorderFixedModeVisibleLines(displayMode, currentIndex, lines);
         } else {
@@ -770,10 +835,19 @@ export function updateLyricsDisplay(currentTime, options = {}) {
                     else break;
                 }
             }
+            let scrollIndex = findCurrentLyricIndexAtTime(state.currentLyrics, effectiveTime + AUTO_CENTER_LEAD_SECONDS);
+            if (
+                leadingGhostCountForPage > 0
+                && Number.isFinite(scrollIndex)
+                && scrollIndex >= 0
+                && scrollIndex <= leadingSyntheticPrefixCount + 1
+            ) {
+                scrollIndex = currentIndex;
+            }
             const shouldSkipCenteringForLeadingGhost =
                 leadingGhostCountForPage > 0 && currentIndex <= leadingSyntheticPrefixCount + 1;
             if (!shouldSkipCenteringForLeadingGhost) {
-                centerActiveLyricLineStrict(currentIndex, lyricsContainer);
+                centerActiveLyricLineStrict(scrollIndex, lyricsContainer);
             }
         }
     }

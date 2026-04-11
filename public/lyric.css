@@ -9,20 +9,23 @@
   --lyric-line-move-ms: 2000ms;
   --lyric-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --lyrics-padding: 0;
+  --lyrics-font-weight: 500;
   --lyrics-inactive-font-weight: 500;
-  --lyrics-active-font-weight: 600;
+  --lyrics-active-font-weight: 500;
   --lyrics-inactive-opacity: 0.35;
-  --lyrics-inactive-blur: 2px;
+  --lyrics-inactive-blur: 0px;
   --lyrics-inactive-scale: 1;
   --lyrics-inactive-offset: 0;
   --lyrics-active-opacity: 1;
   --lyrics-active-scale: 1;
   --lyrics-active-offset: 0;
-  --lyrics-active-stroke-width: 0.0125em;
+  --lyrics-active-stroke-width: 0;
   --lyrics-active-stroke-color: var(--text-primary);
   --lyrics-duration: 2s;
   --lyrics-scale-duration: 0.5s;
   --lyrics-opacity-transition: 600ms;
+  --lyrics-line-state-transition: 380ms;
+  --lyrics-line-state-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --lyrics-glow-duration: var(--lyrics-duration);
   --lyrics-wobble-duration: calc(var(--lyrics-duration) / 2);
   --lyrics-wobble-amplitude: 5px;
@@ -72,7 +75,13 @@ html {
   filter: blur(var(--lyrics-inactive-blur));
   scale: var(--lyrics-inactive-scale);
   translate: var(--lyrics-inactive-offset);
-  transition: opacity 260ms ease-out, filter 320ms ease-out;
+  transition:
+    opacity 260ms ease-out,
+    filter var(--lyrics-line-state-transition) var(--lyrics-line-state-ease),
+    scale var(--lyrics-line-state-transition) var(--lyrics-line-state-ease),
+    translate var(--lyrics-line-state-transition) var(--lyrics-line-state-ease),
+    font-variation-settings var(--lyrics-line-state-transition) var(--lyrics-line-state-ease),
+    text-shadow var(--lyrics-line-state-transition) var(--lyrics-line-state-ease);
   
             margin-top: calc(var(--lyrics-line-outer-gap, 16px) / 2);
             margin-bottom: calc(var(--lyrics-line-outer-gap, 16px) / 2);
@@ -93,7 +102,7 @@ html {
   filter: blur(0);
   scale: var(--lyrics-active-scale);
   translate: var(--lyrics-active-offset);
-  text-shadow: 0 0 15px rgb(0, 0, 0);
+  text-shadow: none;
   
 }
 
@@ -255,7 +264,7 @@ html {
   letter-spacing: 0.01em;
   opacity: calc(var(--lyrics-inactive-opacity) * 0.92);
   color: color-mix(in srgb, currentColor 88%, white 12%);
-  text-shadow: 0 0 10px rgba(0, 0, 0, 0.45);
+  text-shadow: none;
   white-space: normal;
 }
 
@@ -334,7 +343,7 @@ html {
   font-weight: var(--lyrics-active-font-weight);
   font-variation-settings: "wght" var(--lyrics-active-font-weight);
   filter: blur(0);
-  text-shadow: 0 0 15px rgb(0, 0, 0);
+  text-shadow: none;
 }
 
 #lyrics-container.plain-mode #plain-lyrics .lyric-word,
@@ -345,10 +354,14 @@ html {
   opacity: var(--lyrics-active-opacity);
 }
 
-/* One-frame reset when a new line becomes current, so words fade in with stagger. */
+/* Keep the incoming line visually inactive until the active-word animation starts,
+   so it never flashes blank between states. */
 .lyric-line.activating-current .lyric-word,
-.lyric-line.activating-current .romanized-word {
-  opacity: 0 !important;
+.lyric-line.activating-current .romanized-word,
+.lyric-line.activating-current .translation-word {
+  opacity: var(--lyrics-inactive-opacity) !important;
+  -webkit-text-stroke-width: 0 !important;
+  -webkit-text-stroke-color: transparent !important;
   animation: none !important;
 }
 

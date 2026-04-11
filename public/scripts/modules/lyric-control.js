@@ -247,9 +247,6 @@ export function initLyricControlPanel(deps = {}) {
     const defaultAutoHideDelayMs = Number.isFinite(deps.autoHideDelayMs)
         ? deps.autoHideDelayMs
         : (isMobileTapMode ? 3000 : 1000);
-    const hoverIdleHideDelayMs = Number.isFinite(deps.hoverIdleHideDelayMs)
-        ? deps.hoverIdleHideDelayMs
-        : defaultAutoHideDelayMs;
     const hoverRevealEnabled = deps.hoverRevealEnabled !== false;
     const wheelRevealEnabled = deps.wheelRevealEnabled !== false;
     const tapRevealEnabled = deps.tapRevealEnabled !== false;
@@ -321,18 +318,6 @@ export function initLyricControlPanel(deps = {}) {
         }, delayMs);
     };
 
-    const scheduleHoverIdleHide = (delayMs = hoverIdleHideDelayMs) => {
-        if (!autoHideEnabled) return;
-        if (!hoverRevealEnabled) return;
-        clearHoverIdleHide();
-        hoverIdleTimeout = setTimeout(() => {
-            hoverIdleTimeout = null;
-            if (!isWidthShortcutHeld && !lyricsWidthDragActive) {
-                hideControls();
-            }
-        }, delayMs);
-    };
-
     const isEditableTarget = (t) => {
         try {
             return !!(t instanceof Element)
@@ -349,6 +334,12 @@ export function initLyricControlPanel(deps = {}) {
             event.preventDefault();
             event.stopPropagation();
             fn();
+            if (isWidthControlHovered || isLyricsWindowHovered || lyricsWidthDragActive || isWidthShortcutHeld) {
+                showControlsWithClose();
+                clearAutoHide();
+                clearHoverIdleHide();
+                return;
+            }
             scheduleAutoHide();
         });
     };
@@ -532,12 +523,14 @@ export function initLyricControlPanel(deps = {}) {
     widthControl.addEventListener('pointerenter', () => {
         isWidthControlHovered = true;
         clearAutoHide();
-        scheduleHoverIdleHide();
+        clearHoverIdleHide();
+        showControlsWithClose();
     });
     widthControl.addEventListener('pointermove', () => {
         isWidthControlHovered = true;
         clearAutoHide();
-        scheduleHoverIdleHide();
+        clearHoverIdleHide();
+        showControlsWithClose();
     });
     widthControl.addEventListener('pointerleave', () => {
         isWidthControlHovered = false;
@@ -549,14 +542,16 @@ export function initLyricControlPanel(deps = {}) {
         if (!hoverRevealEnabled) return;
         isLyricsWindowHovered = true;
         clearAutoHide();
+        clearHoverIdleHide();
         showControls();
-        scheduleHoverIdleHide();
     };
 
     const onLyricsWindowEnter = () => {
         if (!hoverRevealEnabled) return;
         if (isLyricsWindowHovered) {
-            scheduleHoverIdleHide();
+            clearAutoHide();
+            clearHoverIdleHide();
+            showControls();
             return;
         }
         onLyricsWindowHoverActivity();
@@ -811,9 +806,9 @@ export const LYRIC_DISPLAY_MODE_VISIBLE_LINES = {
 export const LYRIC_DISPLAY_MODE_ORDER = ['scroll', 'fixed-3', 'fixed-2', 'fixed-1'];
 
 export const LYRIC_FONT_WEIGHT_PRESETS = {
-    thin: { label: 'Thin', inactive: 400, active: 500 },
-    regular: { label: 'Regular', inactive: 500, active: 600 },
-    bold: { label: 'Bold', inactive: 700, active: 800 }
+    thin: { label: 'Thin', inactive: 400, active: 400 },
+    regular: { label: 'Regular', inactive: 500, active: 500 },
+    bold: { label: 'Bold', inactive: 700, active: 700 }
 };
 export const LYRIC_FONT_WEIGHT_ORDER = ['thin', 'regular', 'bold'];
 
