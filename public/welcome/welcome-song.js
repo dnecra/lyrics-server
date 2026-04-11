@@ -1,5 +1,5 @@
 import { state } from '../scripts/modules/config.js';
-import { updateLyricsDisplay, displayLyricsUI, getLyricDisplayMode, setLyricDisplayMode } from '../scripts/modules/lyric.js';
+import { updateLyricsDisplay, displayLyricsUI, getLyricDisplayMode, setLyricDisplayMode, centerActiveLyricLineStrict } from '../scripts/modules/lyric.js';
 import {
     initLyricDynamicTheme,
     getLyricDynamicThemeEnabled,
@@ -641,6 +641,8 @@ function scheduleViewportSync() {
 
 function runViewportSyncAndRecenter() {
     if (viewportSyncTimeout) { clearTimeout(viewportSyncTimeout); viewportSyncTimeout = null; }
+    const shouldCenterActiveLine = getLyricDisplayMode() === 'scroll';
+    const activeIndex = shouldCenterActiveLine ? captureCurrentActiveLyricIndex() : -1;
     scheduleViewportSync();
     if (recenterAfterResizeRaf) cancelAnimationFrame(recenterAfterResizeRaf);
     recenterAfterResizeRaf = requestAnimationFrame(() => {
@@ -648,6 +650,10 @@ function runViewportSyncAndRecenter() {
             recenterAfterResizeRaf = null;
             const elapsed = Number(state?.currentSongData?.elapsedSeconds);
             if (Number.isFinite(elapsed) && elapsed >= 0) updateLyricsDisplay(elapsed);
+            if (!shouldCenterActiveLine || activeIndex < 0) return;
+            const lyricsContainer = document.getElementById('lyrics-container');
+            if (!lyricsContainer) return;
+            centerActiveLyricLineStrict(activeIndex, lyricsContainer, { behavior: 'instant' });
         });
     });
 }
@@ -1752,11 +1758,11 @@ async function init() {
             hoverRevealEnabled: false,
             wheelRevealEnabled: false,
             tapRevealEnabled: false,
+            autoHideEnabled: false,
 
             // Labels
             updateAllLabels: updateAllLyricControlLabels
         }));
-        runWelcomeInitStep('initializeLyricControlLabelHoverReset', initializeLyricControlLabelHoverReset);
         runWelcomeInitStep('initializeDynamicThemeDependentSync', initializeDynamicThemeDependentSync);
         runWelcomeInitStep('initTranslationToggleVisibilityObserver', initTranslationToggleVisibilityObserver);
 

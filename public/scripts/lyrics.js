@@ -580,23 +580,18 @@ function runViewportSyncAndRecenter() {
         viewportSyncTimeout = null;
     }
 
-    const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
-    const layoutContainer = document.getElementById('layout-container');
-    const isMobileCenterScroll =
-        viewportWidth <= 767
-        && !!layoutContainer?.classList.contains('position-center')
-        && getLyricDisplayMode() === 'scroll';
-    const activeIndex = isMobileCenterScroll ? captureCurrentActiveLyricIndex() : -1;
+    const shouldCenterActiveLine = getLyricDisplayMode() === 'scroll';
+    const activeIndex = shouldCenterActiveLine ? captureCurrentActiveLyricIndex() : -1;
     scheduleViewportSync();
 
     if (recenterAfterResizeRaf) cancelAnimationFrame(recenterAfterResizeRaf);
     recenterAfterResizeRaf = requestAnimationFrame(() => {
         recenterAfterResizeRaf = requestAnimationFrame(() => {
             recenterAfterResizeRaf = null;
-            if (!isMobileCenterScroll || activeIndex < 0) return;
+            if (!shouldCenterActiveLine || activeIndex < 0) return;
             const lyricsContainer = document.getElementById('lyrics-container');
             if (!lyricsContainer) return;
-            centerActiveLyricLineStrict(activeIndex, lyricsContainer);
+            centerActiveLyricLineStrict(activeIndex, lyricsContainer, { behavior: 'instant' });
         });
     });
 }

@@ -158,6 +158,24 @@ function reorderFixedModeVisibleLines(mode, currentIndex, lines) {
     });
 }
 
+function restoreNaturalLyricDomOrder(lines) {
+    if (!Array.isArray(lines) || lines.length === 0) return;
+    const parent = lines[0]?.parentElement;
+    if (!parent) return;
+
+    [...lines]
+        .sort((a, b) => {
+            const aIndex = Number.parseInt(a?.dataset?.index || '-1', 10);
+            const bIndex = Number.parseInt(b?.dataset?.index || '-1', 10);
+            return aIndex - bIndex;
+        })
+        .forEach((line) => {
+            if (line?.parentElement === parent) {
+                parent.appendChild(line);
+            }
+        });
+}
+
 export function getLyricDisplayMode() {
     return currentLyricDisplayMode;
 }
@@ -740,6 +758,8 @@ export function updateLyricsDisplay(currentTime, options = {}) {
 
         if (displayMode !== 'scroll') {
             reorderFixedModeVisibleLines(displayMode, currentIndex, lines);
+        } else {
+            restoreNaturalLyricDomOrder(lines);
         }
 
         if ((hasActiveLineChanged || hasDisplayModeChanged || hasExpandedModeChanged) && displayMode === 'scroll') {

@@ -38,7 +38,7 @@
 /* layout-container and lyrics-width-control sit above the dim layer */
 #layout-container  { z-index: 2; }
 #lyrics-width-control,
-#close-dummy-control { z-index: 3; }
+#close-dummy-control { z-index: 10020; }
 #wt-dim.under-layout { background: rgba(0,0,0,0.9); }
 #wt-dim.half         { background: rgba(0,0,0,0.75); }
 #wt-dim.full         { background: rgba(0,0,0,0.9); }

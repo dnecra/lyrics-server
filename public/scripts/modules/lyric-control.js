@@ -253,6 +253,7 @@ export function initLyricControlPanel(deps = {}) {
     const hoverRevealEnabled = deps.hoverRevealEnabled !== false;
     const wheelRevealEnabled = deps.wheelRevealEnabled !== false;
     const tapRevealEnabled = deps.tapRevealEnabled !== false;
+    const autoHideEnabled = deps.autoHideEnabled !== false;
     const syncScrollHintCopy = () => {
         if (!scrollHint) return;
         const leadingText = scrollHint.querySelector('.lyrics-scroll-hint-text');
@@ -265,7 +266,6 @@ export function initLyricControlPanel(deps = {}) {
         scrollHint.setAttribute('aria-hidden', visible ? 'false' : 'true');
         scrollHint.classList.toggle('show', visible);
     };
-
     // Internal state mirrors old implementations.
     let autoHideTimeout = null;
     let hoverIdleTimeout = null;
@@ -305,6 +305,7 @@ export function initLyricControlPanel(deps = {}) {
     };
 
     const scheduleAutoHide = (delayMs = defaultAutoHideDelayMs) => {
+        if (!autoHideEnabled) return;
         // If caller provided scheduling, prefer it (keeps behavior identical to existing pages).
         if (scheduleWidthControlAutoHide) {
             scheduleWidthControlAutoHide(delayMs);
@@ -321,6 +322,7 @@ export function initLyricControlPanel(deps = {}) {
     };
 
     const scheduleHoverIdleHide = (delayMs = hoverIdleHideDelayMs) => {
+        if (!autoHideEnabled) return;
         if (!hoverRevealEnabled) return;
         clearHoverIdleHide();
         hoverIdleTimeout = setTimeout(() => {
