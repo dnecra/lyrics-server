@@ -31,11 +31,6 @@ import {
 } from './modules/lyric-control.js';
 import { canonicalizeText, escapeHtml, escapeHtmlAttribute } from './modules/utils.js';
 
-// Enable "hide lines after active blank-note" only for dedicated lyrics page.
-window.__lyricsBlankCutoffEnabled = true;
-window.__lyricsLeadingGhostLinesCount = 0;
-window.__lyricsLeadingSpacingGhostLinesCount = 0;
-
 // Lyrics app specific state
 let lyricsContainerClickable = false;
 const SETTINGS_KEY = 'lyricsSettings';

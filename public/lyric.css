@@ -109,15 +109,24 @@ html {
 
 .lyric-line.hidden-after-blank {
   opacity: 0 !important;
-  pointer-events: none !important;
-  filter: blur(3px) brightness(0.88) !important;
-  scale: 0.992;
-  translate: 0 0;
-  transition:
-    opacity 1400ms var(--lyrics-line-state-ease),
-    filter 1400ms var(--lyrics-line-state-ease),
-    scale 1400ms var(--lyrics-line-state-ease),
-    translate 1400ms var(--lyrics-line-state-ease);
+  transition: opacity 2000ms ease !important;
+}
+
+#lyrics-container.scroll-line-mode .lyric-line.blank-fade-pending {
+  opacity: var(--lyrics-active-opacity) !important;
+}
+
+#lyrics-container.scroll-line-mode .lyric-line.blank-fade-pending .lyric-word,
+#lyrics-container.scroll-line-mode .lyric-line.blank-fade-pending .romanized-word,
+#lyrics-container.scroll-line-mode .lyric-line.blank-fade-pending .translation-word {
+  opacity: var(--lyrics-active-opacity) !important;
+}
+
+#lyrics-container.scroll-line-mode .lyric-line.hidden-after-blank .lyric-word,
+#lyrics-container.scroll-line-mode .lyric-line.hidden-after-blank .romanized-word,
+#lyrics-container.scroll-line-mode .lyric-line.hidden-after-blank .translation-word {
+  opacity: 0 !important;
+  transition: opacity 2000ms ease !important;
 }
 
 /* -- current / active line -- */
@@ -141,10 +150,6 @@ html {
   text-shadow: none;
 }
 
-
-
-
-/* Smaller visual treatment for placeholder music-note rows (♪). */
 .lyric-line.music-note-line {
   font-size: calc(var(--lyric-font-size, 27px) * 0.5);
   line-height: calc(var(--lyric-line-height-actual) - var(--lyric-wrap-line-height-reduction, 0px));
@@ -178,7 +183,6 @@ html {
   padding: 0 0.08em;
 }
 
-/* Align placeholder music-note rows with the current lyrics position mode. */
 #layout-container.position-right .lyric-line.music-note-line {
   justify-content: flex-end;
 }
@@ -199,13 +203,6 @@ html {
 #layout-container:not(.position-right):not(.position-center) .lyric-line.music-note-line .text-lyrics {
   justify-content: flex-start;
 }
-
-
-.lyric-line.leading-ghost-line {
-  min-height: calc(var(--lyric-line-height-actual) * 2);
-  line-height: calc(var(--lyric-line-height-actual) * 2);
-}
-
 /* -- word layer (shared by synced + plain + romanized rows) -- */
 
 .text-lyrics {
@@ -436,6 +433,12 @@ html {
 
 .lyric-line.activating-current {
   opacity: var(--lyrics-active-opacity);
+}
+
+#lyrics-container.fixed-line-mode .lyric-line.activating-current .lyric-word,
+#lyrics-container.fixed-line-mode .lyric-line.activating-current .romanized-word,
+#lyrics-container.fixed-line-mode .lyric-line.activating-current .translation-word {
+  opacity: 0 !important;
 }
 
 .lyric-line.transitioning-out .lyric-word,

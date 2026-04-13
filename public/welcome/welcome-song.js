@@ -124,9 +124,6 @@ let DUMMY_TRANSLATED_SYNCED = [
 
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-window.__lyricsBlankCutoffEnabled = true;
-window.__lyricsLeadingGhostLinesCount = 1;
-window.__lyricsLeadingSpacingGhostLinesCount = 0;
 window.manuallyPaused = false;
 
 let lyricsContainerClickable = false;

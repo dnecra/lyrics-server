@@ -4,22 +4,16 @@ let lastRenderedLyricIndex = -1;
 let lastRenderedLyricsExpanded = null;
 const MUSIC_NOTE_SYMBOL = '\u266A';
 const GAP_FILL_BASE_THRESHOLD_SECONDS = 20;
-const GAP_FILL_THRESHOLD_PER_WORD_SECONDS = 1;
-const FINAL_BLANK_MIN_GAP_SECONDS = 3;
 const FINAL_BLANK_TARGET_GAP_SECONDS = 5;
-const AUTO_CENTER_LEAD_SECONDS = 0;
 const LYRICS_OFFSET_SECONDS = -1.5;
 const LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS = 2.0;
 const LYRIC_INDEX_HYSTERESIS_SECONDS = 0;
 const AUTO_CENTER_TOLERANCE_PX = 6;
 const AUTO_CENTER_RETARGET_DEADZONE_PX = 8;
-const AUTO_CENTER_ANIMATION_DURATION_MS = 460;
-const AUTO_CENTER_ANIMATION_FAST_DURATION_MS = 200;
 let lyricLineElements = [];
 let lyricsRenderVersion = 0;
 let lastStableLyricEffectiveTime = null;
 let latchedBlankCutoffIndex = -1;
-let pendingBlankCutoffAnimationFrame = 0;
 let pendingLeavingCurrentAnimationFrame = 0;
 const LYRIC_DISPLAY_MODES = new Set(['scroll', 'fixed-3', 'fixed-2', 'fixed-1']);
 const LYRICS_CONTAINER_EXIT_DURATION_MS = 1000;
@@ -28,7 +22,21 @@ let lastRenderedLyricDisplayMode = 'scroll';
 let compactNoLyricsLeavingTimer = null;
 let compactNoLyricsEnteringTimer = null;
 let lyricsContainerHideTimer = null;
+let lyricModeSwitchRevealFrame = 0;
 const activeScrollAnimations = new WeakMap();
+const fixedLineHideTimers = new WeakMap();
+const scrollBlankFadeFrames = new WeakMap();
+const BLANK_CUTOFF_HIDE_DELAY_MS = 2000;
+
+function isBlankCutoffEnabledForCurrentPage() {
+    const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
+    const isPhoneLayout = !!document.documentElement?.classList?.contains('is-phone-layout');
+    if (viewportWidth <= 767 || isPhoneLayout) {
+        return false;
+    }
+    // Default to enabled unless the page explicitly disables it.
+    return window.__lyricsBlankCutoffEnabled !== false;
+}
 
 function applyLyricsTimingOffset(currentTimeSeconds) {
     const numericTime = Number(currentTimeSeconds);
@@ -42,6 +50,32 @@ function clearPendingLyricsContainerHide() {
         clearTimeout(lyricsContainerHideTimer);
         lyricsContainerHideTimer = null;
     }
+}
+
+function cancelPendingLyricModeReveal() {
+    if (lyricModeSwitchRevealFrame) {
+        cancelAnimationFrame(lyricModeSwitchRevealFrame);
+        lyricModeSwitchRevealFrame = 0;
+    }
+}
+
+function beginLyricModeSwitchMask() {
+    const lyricsContainer = document.getElementById('lyrics-container');
+    if (!lyricsContainer) return;
+    cancelPendingLyricModeReveal();
+    lyricsContainer.classList.add('mode-switching');
+}
+
+function endLyricModeSwitchMaskSoon() {
+    const lyricsContainer = document.getElementById('lyrics-container');
+    if (!lyricsContainer) return;
+    cancelPendingLyricModeReveal();
+    lyricModeSwitchRevealFrame = requestAnimationFrame(() => {
+        lyricModeSwitchRevealFrame = requestAnimationFrame(() => {
+            lyricModeSwitchRevealFrame = 0;
+            lyricsContainer.classList.remove('mode-switching');
+        });
+    });
 }
 
 function setCompactNoLyricsState(enabled) {
@@ -89,21 +123,6 @@ function setCompactNoLyricsState(enabled) {
     }, 220);
 }
 
-function isBlankCutoffEnabledForCurrentPage() {
-    const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
-    const isPhoneLayout = !!document.documentElement?.classList?.contains('is-phone-layout');
-    if (viewportWidth <= 767 || isPhoneLayout) {
-        return false;
-    }
-    return !!window.__lyricsBlankCutoffEnabled;
-}
-
-function getLeadingGhostLinesCountForCurrentPage() {
-    const raw = Number(window.__lyricsLeadingGhostLinesCount);
-    if (!Number.isFinite(raw)) return 0;
-    return Math.max(0, Math.floor(raw));
-}
-
 function countLyricWords(text) {
     if (!text || typeof text !== 'string') return 0;
     const trimmed = text.trim();
@@ -131,30 +150,63 @@ function clearLyricLineElementsCache() {
     lyricLineElements = [];
 }
 
-function cancelPendingBlankCutoffAnimation() {
-    if (pendingBlankCutoffAnimationFrame) {
-        cancelAnimationFrame(pendingBlankCutoffAnimationFrame);
-        pendingBlankCutoffAnimationFrame = 0;
-    }
-}
-
-function scheduleBlankCutoffHide(linesToHide) {
-    if (!Array.isArray(linesToHide) || linesToHide.length === 0) return;
-    cancelPendingBlankCutoffAnimation();
-    pendingBlankCutoffAnimationFrame = requestAnimationFrame(() => {
-        pendingBlankCutoffAnimationFrame = 0;
-        linesToHide.forEach((line) => {
-            if (!line?.isConnected) return;
-            line.classList.add('hidden-after-blank');
-        });
-    });
-}
-
 function cancelPendingLeavingCurrentAnimation() {
     if (pendingLeavingCurrentAnimationFrame) {
         cancelAnimationFrame(pendingLeavingCurrentAnimationFrame);
         pendingLeavingCurrentAnimationFrame = 0;
     }
+}
+
+function clearScheduledFixedLineHide(line) {
+    if (!line) return;
+    const timerId = fixedLineHideTimers.get(line);
+    if (timerId) {
+        clearTimeout(timerId);
+        fixedLineHideTimers.delete(line);
+    }
+}
+
+function cancelScheduledScrollBlankFade(line) {
+    if (!line) return;
+    const rafId = scrollBlankFadeFrames.get(line);
+    if (rafId) {
+        cancelAnimationFrame(rafId);
+        scrollBlankFadeFrames.delete(line);
+    }
+}
+
+function scheduleScrollBlankFade(line) {
+    if (!line) return;
+    if (line.classList.contains('hidden-after-blank')) return;
+    cancelScheduledScrollBlankFade(line);
+    line.classList.add('blank-fade-pending');
+    const rafId = requestAnimationFrame(() => {
+        scrollBlankFadeFrames.delete(line);
+        if (!line?.isConnected) return;
+        line.classList.remove('blank-fade-pending');
+        line.classList.add('hidden-after-blank');
+    });
+    scrollBlankFadeFrames.set(line, rafId);
+}
+
+function scheduleFixedLineHide(line, delayMs = BLANK_CUTOFF_HIDE_DELAY_MS) {
+    if (!line) return;
+    clearScheduledFixedLineHide(line);
+    const timeoutMs = Math.max(0, Number(delayMs) || 0);
+    if (timeoutMs === 0) {
+        line.classList.add('fixed-hidden');
+        line.classList.remove('fixed-leaving');
+        return;
+    }
+
+    line.classList.add('fixed-leaving');
+    const timerId = setTimeout(() => {
+        fixedLineHideTimers.delete(line);
+        if (!line?.isConnected) return;
+        line.classList.add('fixed-hidden');
+        line.classList.remove('fixed-leaving');
+    }, timeoutMs);
+    fixedLineHideTimers.set(line, timerId);
 }
 
 function scheduleLeavingCurrentRelease(linesToRelease) {
@@ -228,10 +280,16 @@ export function getLyricDisplayMode() {
 export function setLyricDisplayMode(mode, { refresh = true } = {}) {
     const nextMode = normalizeLyricDisplayMode(mode);
     const modeChanged = currentLyricDisplayMode !== nextMode;
+    if (modeChanged) {
+        beginLyricModeSwitchMask();
+    }
     currentLyricDisplayMode = nextMode;
     updateLyricDisplayModeDomState(nextMode);
 
-    if (!modeChanged) return currentLyricDisplayMode;
+    if (!modeChanged) {
+        endLyricModeSwitchMaskSoon();
+        return currentLyricDisplayMode;
+    }
 
     const lyricsContainer = document.getElementById('lyrics-container');
     if (lyricsContainer && nextMode !== 'scroll') {
@@ -245,6 +303,8 @@ export function setLyricDisplayMode(mode, { refresh = true } = {}) {
             updateLyricsDisplay(elapsed);
         }
     }
+
+    endLyricModeSwitchMaskSoon();
 
     return currentLyricDisplayMode;
 }
@@ -401,6 +461,7 @@ function applyWordDelaySequence(words, staggerSeconds) {
     words.forEach((word, index) => {
         const delay = `${(index * staggerSeconds).toFixed(3)}s`;
         word.style.willChange = 'opacity, transform';
+        word.style.setProperty('--word-reveal-delay', delay);
         word.style.transitionDelay = '0s';
         word.style.animationDelay = delay;
     });
@@ -786,37 +847,7 @@ export function updateLyricsDisplay(currentTime, options = {}) {
 
     if (!state.currentLyrics || state.currentLyrics.length === 0) return;
 
-    const lyricsLength = state.currentLyrics.length;
     let currentIndex = findCurrentLyricIndexAtTime(state.currentLyrics, effectiveTime);
-
-    // Keep the frontend-injected leading placeholder active from 0s until the
-    // first actual lyric line starts, so the opening blank row never looks inactive.
-    if (lyricsLength > 0 && effectiveTime >= 0) {
-        let leadingSyntheticIndex = -1;
-        let firstActualLineTime = null;
-
-        for (let i = 0; i < lyricsLength; i += 1) {
-            const line = state.currentLyrics[i];
-            if (line?.isLeadingSynthetic) {
-                if (!line?.isGhostLeadingSynthetic) {
-                    leadingSyntheticIndex = i;
-                }
-                continue;
-            }
-
-            const lineTime = Number(line?.time);
-            firstActualLineTime = Number.isFinite(lineTime) ? lineTime : 0;
-            break;
-        }
-
-        if (
-            leadingSyntheticIndex >= 0
-            && Number.isFinite(firstActualLineTime)
-            && effectiveTime < firstActualLineTime
-        ) {
-            currentIndex = leadingSyntheticIndex;
-        }
-    }
 
     currentIndex = stabilizeCurrentLyricIndex(
         state.currentLyrics,
@@ -832,12 +863,12 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     const displayMode = normalizeLyricDisplayMode(currentLyricDisplayMode);
     updateLyricDisplayModeDomState(displayMode);
     const isExpanded = lyricsContainer.classList.contains('expanded');
-    const leadingGhostCountForPage = getLeadingGhostLinesCountForCurrentPage();
 
     const hasActiveLineChanged = lastRenderedLyricIndex !== currentIndex;
     const hasExpandedModeChanged = lastRenderedLyricsExpanded !== isExpanded;
     const hasDisplayModeChanged = lastRenderedLyricDisplayMode !== displayMode;
     if (!hasActiveLineChanged && !hasExpandedModeChanged && !hasDisplayModeChanged) {
+        endLyricModeSwitchMaskSoon();
         return;
     }
 
@@ -863,10 +894,8 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     const isFrontendBlankNote = (line) => {
         const text = (line?.text || '').toString().trim();
         const isNote = text === MUSIC_NOTE_SYMBOL;
-        const isBlankLike = !!line?.isEmpty || !!line?.isSourceBlank || text === '';
-        return isBlankLike
-            && (isNote || text === '')
-            && !line?.isLeadingSynthetic;
+        const isBlankLike = !!line?.isEmpty || !!line?.isSourceBlank || !!line?.isInjectedBlank || text === '';
+        return isBlankLike && (isNote || text === '') && !line?.isLeadingSynthetic;
     };
     const latestBlankCutoffIndex = (() => {
         let idx = -1;
@@ -890,15 +919,20 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     const shouldApplyBlankCutoff = isBlankCutoffEnabledForCurrentPage() && activeBlankCutoffIndex >= 0;
 
     if (hasActiveLineChanged || hasExpandedModeChanged || hasDisplayModeChanged) {
-        const pendingBlankCutoffLines = [];
         const pendingLeavingCurrentLines = [];
         const previousActiveIndex = Number.isFinite(lastRenderedLyricIndex) ? lastRenderedLyricIndex : -1;
 
         lines.forEach((line, index) => {
-            const wasHiddenAfterBlank = line.classList.contains('hidden-after-blank');
             const wasCurrent = line.classList.contains('current');
+            const shouldHideAfterBlank = shouldApplyBlankCutoff && index < activeBlankCutoffIndex;
             line.classList.remove('current', 'previous', 'upcoming', 'before', 'after', 'far-before', 'far-after', 'activating-current');
             line.classList.remove('fixed-secondary');
+            if (!shouldHideAfterBlank) {
+                line.classList.remove('hidden-after-blank');
+                line.classList.remove('blank-fade-pending');
+            }
+            clearScheduledFixedLineHide(line);
+            cancelScheduledScrollBlankFade(line);
             const relation = getLyricLineRelation(currentIndex, index);
             line.dataset.lineRelation = relation;
 
@@ -909,14 +943,22 @@ export function updateLyricsDisplay(currentTime, options = {}) {
             } else {
                 line.classList.add('current');
                 if (shouldAnimateActiveLine) {
+                    if (displayMode !== 'scroll') {
+                        line.classList.add('activating-current');
+                    }
                     applyActiveWordStagger(line);
                 }
                 line.classList.remove('leaving-current');
             }
 
             if (index !== currentIndex && shouldAnimateActiveLine && index === previousActiveIndex && wasCurrent) {
-                line.classList.add('leaving-current');
-                pendingLeavingCurrentLines.push(line);
+                const shouldUseLeavingCurrent = !(displayMode === 'scroll' && shouldHideAfterBlank);
+                if (shouldUseLeavingCurrent) {
+                    line.classList.add('leaving-current');
+                    pendingLeavingCurrentLines.push(line);
+                } else {
+                    line.classList.remove('leaving-current');
+                }
             }
 
             if (!isExpanded) {
@@ -935,8 +977,14 @@ export function updateLyricsDisplay(currentTime, options = {}) {
             if (displayMode !== 'scroll') {
                 const shouldShow = shouldShowLineForDisplayMode(displayMode, currentIndex, index);
                 if (!shouldShow) {
-                    line.classList.add('fixed-hidden');
-                    line.classList.remove('fixed-leaving');
+                    if (shouldHideAfterBlank) {
+                        line.classList.add('hidden-after-blank', 'fixed-leaving');
+                        line.classList.remove('fixed-hidden');
+                        scheduleFixedLineHide(line, BLANK_CUTOFF_HIDE_DELAY_MS);
+                    } else {
+                        line.classList.add('fixed-hidden');
+                        line.classList.remove('fixed-leaving');
+                    }
                 } else {
                     line.classList.remove('fixed-hidden', 'fixed-leaving');
                 }
@@ -944,25 +992,14 @@ export function updateLyricsDisplay(currentTime, options = {}) {
                 line.classList.remove('fixed-hidden', 'fixed-leaving');
             }
 
-            const sourceLine = state.currentLyrics[index];
-            const shouldHideAfterBlank = shouldApplyBlankCutoff && index < activeBlankCutoffIndex && !sourceLine?.isLeadingSynthetic;
             if (shouldHideAfterBlank) {
-                if (!wasHiddenAfterBlank) {
-                    line.classList.remove('hidden-after-blank');
-                    pendingBlankCutoffLines.push(line);
+                if (displayMode === 'scroll') {
+                    scheduleScrollBlankFade(line);
+                } else {
+                    line.classList.add('hidden-after-blank');
                 }
-            } else if (wasHiddenAfterBlank) {
-                line.classList.remove('hidden-after-blank');
             }
         });
-
-        if (displayMode === 'scroll') {
-            cancelPendingBlankCutoffAnimation();
-            scheduleBlankCutoffHide(pendingBlankCutoffLines);
-        } else {
-            cancelPendingBlankCutoffAnimation();
-            pendingBlankCutoffLines.forEach((line) => line.classList.add('hidden-after-blank'));
-        }
 
         scheduleLeavingCurrentRelease(pendingLeavingCurrentLines);
 
@@ -976,39 +1013,29 @@ export function updateLyricsDisplay(currentTime, options = {}) {
         }
 
         if ((hasActiveLineChanged || hasDisplayModeChanged || hasExpandedModeChanged) && displayMode === 'scroll') {
-            let leadingSyntheticPrefixCount = -1;
-            if (leadingGhostCountForPage > 0) {
-                for (let i = 0; i < state.currentLyrics.length; i += 1) {
-                    if (state.currentLyrics[i]?.isLeadingSynthetic) leadingSyntheticPrefixCount = i;
-                    else break;
-                }
+            const currentSourceLine = state.currentLyrics[currentIndex];
+            const isCurrentBlankCutoffLine = shouldApplyBlankCutoff && isFrontendBlankNote(currentSourceLine);
+            if (isCurrentBlankCutoffLine) {
+                lastRenderedLyricIndex = currentIndex;
+                lastRenderedLyricsExpanded = isExpanded;
+                lastRenderedLyricDisplayMode = displayMode;
+                endLyricModeSwitchMaskSoon();
+                return;
             }
-            let scrollIndex = currentIndex;
-            if (
-                leadingGhostCountForPage > 0
-                && Number.isFinite(scrollIndex)
-                && scrollIndex >= 0
-                && scrollIndex <= leadingSyntheticPrefixCount + 1
-            ) {
-                scrollIndex = currentIndex;
-            }
-            const shouldSkipCenteringForLeadingGhost =
-                leadingGhostCountForPage > 0 && currentIndex <= leadingSyntheticPrefixCount + 1;
-            if (!shouldSkipCenteringForLeadingGhost) {
-                // Defer by one animation frame so the browser reflows the
-                // newly-applied .current class before we read offsetTop.
-                // This makes the scroll fire at the same frame as word-bounce,
-                // eliminating the "late" feeling.
-                requestAnimationFrame(() => {
-                    centerActiveLyricLineStrict(scrollIndex, lyricsContainer);
-                });
-            }
+            // Defer by one animation frame so the browser reflows the
+            // newly-applied .current class before we read offsetTop.
+            // This makes the scroll fire at the same frame as word-bounce,
+            // eliminating the "late" feeling.
+            requestAnimationFrame(() => {
+                centerActiveLyricLineStrict(currentIndex, lyricsContainer);
+            });
         }
     }
 
     lastRenderedLyricIndex = currentIndex;
     lastRenderedLyricsExpanded = isExpanded;
     lastRenderedLyricDisplayMode = displayMode;
+    endLyricModeSwitchMaskSoon();
 }
 
 export function getLyricLineRelation(currentIndex, lineIndex) {
@@ -1093,30 +1120,116 @@ function buildWordAnimatedLine(text, {
 function parseSyncedLyrics(syncedSource) {
     if (!syncedSource) return [];
     const normalizeParsedLines = (lines) => Array.isArray(lines) ? lines.filter(Boolean) : [];
+    const createLyricLine = ({
+        time,
+        rawTime = time,
+        text = '',
+        sourceIndex = null,
+        parsedIndex = null,
+        isInjectedBlank = false,
+        injectedKind = '',
+        isLeadingSynthetic = false
+    }) => {
+        const numericTime = Number(time);
+        const safeTime = Number.isFinite(numericTime) ? Math.max(0, numericTime) : 0;
+        const normalizedText = (text || '').toString();
+        const trimmedText = normalizedText.trim();
+        const isBlank = trimmedText === '';
+        return {
+            time: safeTime,
+            rawTime: Number.isFinite(Number(rawTime)) ? Number(rawTime) : safeTime,
+            text: normalizedText,
+            isEmpty: isBlank,
+            isSourceBlank: !isInjectedBlank && isBlank,
+            isInjectedBlank,
+            injectedKind,
+            isLeadingSynthetic,
+            sourceIndex: Number.isFinite(Number(sourceIndex)) ? Number(sourceIndex) : null,
+            parsedIndex: Number.isFinite(Number(parsedIndex)) ? Number(parsedIndex) : null
+        };
+    };
+    const isBlankLine = (line) => {
+        const text = (line?.text || '').toString().trim();
+        return !!line?.isInjectedBlank || !!line?.isEmpty || !!line?.isSourceBlank || text === '';
+    };
+    const injectSyntheticBlankLines = (lines) => {
+        if (!Array.isArray(lines) || lines.length === 0) return [];
+
+        const injected = [];
+        const firstLine = lines[0];
+        const firstLineTime = Number(firstLine?.time);
+        if (!isBlankLine(firstLine) && Number.isFinite(firstLineTime) && firstLineTime > 0) {
+            injected.push(createLyricLine({
+                time: 0,
+                text: '',
+                isInjectedBlank: true,
+                injectedKind: 'leading-gap',
+                isLeadingSynthetic: true
+            }));
+        }
+
+        for (let i = 0; i < lines.length; i += 1) {
+            const currentLine = lines[i];
+            injected.push(currentLine);
+
+            if (i >= lines.length - 1) continue;
+
+            const nextLine = lines[i + 1];
+            const currentTime = Number(currentLine?.time);
+            const nextTime = Number(nextLine?.time);
+            if (!Number.isFinite(currentTime) || !Number.isFinite(nextTime)) continue;
+
+            const gapSeconds = nextTime - currentTime;
+            if (gapSeconds <= GAP_FILL_BASE_THRESHOLD_SECONDS) continue;
+            if (isBlankLine(currentLine) || isBlankLine(nextLine)) continue;
+
+            const blankTime = currentTime + FINAL_BLANK_TARGET_GAP_SECONDS;
+            if (!(blankTime < nextTime)) continue;
+
+            injected.push(createLyricLine({
+                time: blankTime,
+                text: '',
+                isInjectedBlank: true,
+                injectedKind: 'mid-gap'
+            }));
+        }
+
+        const lastLine = lines[lines.length - 1];
+        const lastLineTime = Number(lastLine?.time);
+        if (!isBlankLine(lastLine) && Number.isFinite(lastLineTime)) {
+            injected.push(createLyricLine({
+                time: lastLineTime + FINAL_BLANK_TARGET_GAP_SECONDS,
+                text: '',
+                isInjectedBlank: true,
+                injectedKind: 'trailing-gap'
+            }));
+        }
+
+        return injected;
+    };
 
     // Array format: [{ time, text }]
     if (Array.isArray(syncedSource)) {
-        return normalizeParsedLines(syncedSource
+        return injectSyntheticBlankLines(normalizeParsedLines(syncedSource
             .map((item, sourceIndex) => {
-                const time = (typeof item?.time === 'number') ? item.time : 0;
+                const numericTime = Number(item?.time);
+                const time = Number.isFinite(numericTime) ? numericTime : 0;
                 const text = (item?.text || '').toString();
-                const trimmedText = text.trim();
-                const isIncomingBlank = !!item?.isEmpty || !!item?.isSourceBlank;
-                const isBlank = isIncomingBlank || trimmedText === '';
-                return {
+                const isIncomingBlank = !!item?.isEmpty || !!item?.isSourceBlank || text.trim() === '';
+                return createLyricLine({
                     time,
-                    text,
-                    isEmpty: isBlank,
-                    isSourceBlank: isBlank,
-                    sourceIndex
-                };
+                    rawTime: time,
+                    text: isIncomingBlank ? '' : text,
+                    sourceIndex,
+                    parsedIndex: sourceIndex
+                });
             })
-            .filter(Boolean));
+            .filter(Boolean)));
     }
 
     // LRC string format
     if (typeof syncedSource === 'string') {
-        return normalizeParsedLines(syncedSource
+        const parsedLines = normalizeParsedLines(syncedSource
             .split(/\r?\n/)
             .map((line, sourceIndex) => {
                 const match = line.match(/\[(\d+):(\d+)\.(\d+)\](.*)/);
@@ -1126,25 +1239,26 @@ function parseSyncedLyrics(syncedSource) {
                 const ms = parseInt(match[3], 10);
                 const divisor = (match[3].length === 3 ? 1000 : 100);
                 const text = (match[4] || '').toString();
-                const trimmedText = text.trim();
                 const rawTime = (min * 60) + sec + (ms / divisor);
-                const time = rawTime;
-                return {
-                    time,
+                return createLyricLine({
+                    time: rawTime,
                     rawTime,
                     text,
-                    isEmpty: trimmedText === '',
-                    isSourceBlank: trimmedText === '',
                     sourceIndex
-                };
+                });
             })
-            .filter(Boolean));
+            .filter(Boolean))
+            .map((line, parsedIndex) => ({
+                ...line,
+                parsedIndex
+            }));
+        return injectSyntheticBlankLines(parsedLines);
     }
 
     return [];
 }
 
-function clampTrailingNoteToSongDuration(lines, songDuration) {
+function clampTrailingBlankToSongDuration(lines, songDuration) {
     if (!Array.isArray(lines) || lines.length === 0) return lines || [];
     const duration = Number(songDuration);
     if (!Number.isFinite(duration) || duration <= 0) return lines;
@@ -1152,13 +1266,13 @@ function clampTrailingNoteToSongDuration(lines, songDuration) {
     const out = [...lines];
     const lastIndex = out.length - 1;
     const last = out[lastIndex];
-    if (!last?.isTrailingNote) return out;
+    if (!last?.isInjectedBlank || last?.injectedKind !== 'trailing-gap') return out;
 
     const trailingTime = Number(last?.time);
     if (!Number.isFinite(trailingTime)) return out;
     if (trailingTime <= duration) return out;
 
-    // Keep the trailing note reachable before playback time clamps at duration.
+    // Keep the trailing blank reachable before playback time clamps at duration.
     const targetTime = Math.max(0, duration - 0.05);
     out[lastIndex] = { ...last, time: targetTime };
     return out;
@@ -1288,8 +1402,8 @@ animateOutLyrics().then(() => {
     lastRenderedLyricDisplayMode = null;
     lastStableLyricEffectiveTime = null;
     latchedBlankCutoffIndex = -1;
-    cancelPendingBlankCutoffAnimation();
     cancelPendingLeavingCurrentAnimation();
+    cancelPendingLyricModeReveal();
 
     if (!isFetchStillValid() || !isRenderStillCurrent()) return;
 
@@ -1321,68 +1435,57 @@ animateOutLyrics().then(() => {
             state.isSyncedLyrics = true;
             state.currentLyrics = parseSyncedLyrics(syncedSource);
             const knownDuration = Number(state.currentSongData?.songDuration ?? data?.songDuration ?? 0);
-            state.currentLyrics = clampTrailingNoteToSongDuration(state.currentLyrics, knownDuration);
+            state.currentLyrics = clampTrailingBlankToSongDuration(state.currentLyrics, knownDuration);
 
             if (state.currentLyrics.length > 0) {
                 if (!isFetchStillValid() || !isRenderStillCurrent()) return;
-                const romanizedBySourceIndex = (() => {
-                    if (!Array.isArray(romanizedSyncedSource)) return null;
-                    const map = new Map();
-                    romanizedSyncedSource.forEach((item, idx) => {
+                const buildAssistIndexMaps = (sourceItems) => {
+                    if (!Array.isArray(sourceItems)) return null;
+                    const bySourceIndex = new Map();
+                    const byParsedIndex = new Map();
+                    sourceItems.forEach((item, idx) => {
+                        const text = (item?.text || '').toString();
                         const rawSourceIndex = Number(item?.sourceIndex);
-                        const key = Number.isFinite(rawSourceIndex) && rawSourceIndex >= 0 ? rawSourceIndex : idx;
-                        if (!map.has(key)) {
-                            map.set(key, (item?.text || '').toString());
+                        const rawParsedIndex = Number(item?.parsedIndex);
+                        if (Number.isFinite(rawSourceIndex) && rawSourceIndex >= 0 && !bySourceIndex.has(rawSourceIndex)) {
+                            bySourceIndex.set(rawSourceIndex, text);
+                        }
+                        const parsedKey = Number.isFinite(rawParsedIndex) && rawParsedIndex >= 0 ? rawParsedIndex : idx;
+                        if (!byParsedIndex.has(parsedKey)) {
+                            byParsedIndex.set(parsedKey, text);
                         }
                     });
-                    return map;
-                })();
-                const translatedBySourceIndex = (() => {
-                    if (!Array.isArray(translatedSyncedSource)) return null;
-                    const map = new Map();
-                    translatedSyncedSource.forEach((item, idx) => {
-                        const rawSourceIndex = Number(item?.sourceIndex);
-                        const key = Number.isFinite(rawSourceIndex) && rawSourceIndex >= 0 ? rawSourceIndex : idx;
-                        if (!map.has(key)) {
-                            map.set(key, (item?.text || '').toString());
-                        }
-                    });
-                    return map;
-                })();
+                    return { bySourceIndex, byParsedIndex };
+                };
+                const romanizedAssistMaps = buildAssistIndexMaps(romanizedSyncedSource);
+                const translatedAssistMaps = buildAssistIndexMaps(translatedSyncedSource);
+                const resolveAssistText = (maps, line) => {
+                    if (!maps || line?.isInjectedBlank) return '';
+                    const sourceIndex = Number(line?.sourceIndex);
+                    if (Number.isFinite(sourceIndex) && sourceIndex >= 0 && maps.bySourceIndex.has(sourceIndex)) {
+                        return (maps.bySourceIndex.get(sourceIndex) || '').toString();
+                    }
+                    const parsedIndex = Number(line?.parsedIndex);
+                    if (Number.isFinite(parsedIndex) && parsedIndex >= 0) {
+                        return (maps.byParsedIndex.get(parsedIndex) || '').toString();
+                    }
+                    return '';
+                };
 
                 state.currentLyrics.forEach((line, index) => {
-                    const text = line?.isGhostLeadingSynthetic
-                        ? ''
-                        : ((line?.isEmpty ? MUSIC_NOTE_SYMBOL : line?.text) ?? '').toString();
-                    let prefetchedRomanized = '';
-                    let prefetchedTranslation = '';
-                    if (romanizedBySourceIndex) {
-                        const sourceIndex = Number(line?.sourceIndex);
-                        if (Number.isFinite(sourceIndex) && sourceIndex >= 0) {
-                            prefetchedRomanized = (romanizedBySourceIndex.get(sourceIndex) || '').toString();
-                        } else {
-                            prefetchedRomanized = (romanizedBySourceIndex.get(index) || '').toString();
-                        }
-                    }
-                    if (translatedBySourceIndex) {
-                        const sourceIndex = Number(line?.sourceIndex);
-                        if (Number.isFinite(sourceIndex) && sourceIndex >= 0) {
-                            prefetchedTranslation = (translatedBySourceIndex.get(sourceIndex) || '').toString();
-                        } else {
-                            prefetchedTranslation = (translatedBySourceIndex.get(index) || '').toString();
-                        }
-                    }
+                    const isBlankLine = !!line?.isEmpty || !!line?.isSourceBlank || !!line?.isInjectedBlank;
+                    const text = isBlankLine
+                        ? MUSIC_NOTE_SYMBOL
+                        : (line?.text ?? '').toString();
+                    const prefetchedRomanized = resolveAssistText(romanizedAssistMaps, line);
+                    const prefetchedTranslation = resolveAssistText(translatedAssistMaps, line);
                     const div = buildWordAnimatedLine(text, {
                         index,
-                        needsRomanization: isNonLatin(text),
-                        isMusicNote: !line?.isGhostLeadingSynthetic
-                            && ((text.trim() === MUSIC_NOTE_SYMBOL) || !!line?.isEmpty),
+                        needsRomanization: !isBlankLine && !line?.isInjectedBlank && isNonLatin(text),
+                        isMusicNote: isBlankLine,
                         prefetchedRomanized,
                         prefetchedTranslation
                     });
-                    if (line?.isGhostLeadingSynthetic) {
-                        div.classList.add('leading-ghost-line');
-                    }
                     applyLineTimingStyles(div, index);
                     if (syncedLyricsContainer) syncedLyricsContainer.appendChild(div);
                 });
@@ -1484,8 +1587,8 @@ export function hideLyricsUI({
     lastRenderedLyricDisplayMode = null;
     lastStableLyricEffectiveTime = null;
     latchedBlankCutoffIndex = -1;
-    cancelPendingBlankCutoffAnimation();
     cancelPendingLeavingCurrentAnimation();
+    cancelPendingLyricModeReveal();
 
     try {
         state.currentLyrics = [];
