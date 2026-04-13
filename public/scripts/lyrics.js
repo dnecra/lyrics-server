@@ -398,13 +398,9 @@ let revealScrollCenterToken = 0;
 let lyricAssistRetryTimeout = null;
 let lyricAssistRetryVideoId = '';
 let lyricAssistRetryCount = 0;
-let startupSongRefreshRetryTimeout = null;
-let startupSongRefreshAttempts = 0;
 let configuredLyricsMinWidthVwCache = null;
 let configuredLyricsMaxWidthVwCache = null;
 const WHEEL_RESIZE_ACTIVE_LINE_FREEZE_MS = 650;
-const STARTUP_SONG_REFRESH_RETRY_DELAY_MS = 1200;
-const STARTUP_SONG_REFRESH_MAX_RETRIES = 15;
 
 function getAuthoredRootCssPercentVar(name, fallback) {
     try {
@@ -2365,34 +2361,7 @@ function resolveInitialBootVisibility() {
     document.body?.classList.remove('lyrics-booting');
 }
 
-function clearStartupSongRefreshRetry() {
-    if (startupSongRefreshRetryTimeout) {
-        clearTimeout(startupSongRefreshRetryTimeout);
-        startupSongRefreshRetryTimeout = null;
-    }
-    startupSongRefreshAttempts = 0;
-}
-
-function scheduleStartupSongRefreshRetry(reason = '') {
-    if (state.currentSongData?.videoId) return;
-    if (startupSongRefreshRetryTimeout) return;
-    if (startupSongRefreshAttempts >= STARTUP_SONG_REFRESH_MAX_RETRIES) return;
-
-    startupSongRefreshAttempts += 1;
-    startupSongRefreshRetryTimeout = setTimeout(() => {
-        startupSongRefreshRetryTimeout = null;
-        refreshSongStateFromServer({
-            allowStartupRetry: true,
-            reason: reason || 'startup-retry'
-        });
-    }, STARTUP_SONG_REFRESH_RETRY_DELAY_MS);
-}
-
 async function refreshSongStateFromServer(options = {}) {
-    const {
-        allowStartupRetry = false,
-        reason = ''
-    } = options;
     try {
         const response = await fetch(`${API_URL}/song`, {
             cache: 'no-store'
@@ -2401,23 +2370,16 @@ async function refreshSongStateFromServer(options = {}) {
             if (response.status !== 404) {
                 console.warn(`[LYRICS] Failed to refresh song state: HTTP ${response.status}`);
             }
-            if (allowStartupRetry && !state.currentSongData?.videoId) {
-                scheduleStartupSongRefreshRetry(reason || `http-${response.status}`);
-            }
             resolveInitialBootVisibility();
             return;
         }
 
         const data = await response.json();
         if (!data || typeof data !== 'object' || !data.videoId) {
-            if (allowStartupRetry && !state.currentSongData?.videoId) {
-                scheduleStartupSongRefreshRetry(reason || 'empty-song-payload');
-            }
             resolveInitialBootVisibility();
             return;
         }
 
-        clearStartupSongRefreshRetry();
         updateNowPlayingFromData(data, {
             isMainApp: false,
             onLyricsDisplay: displayLyrics,
@@ -2426,9 +2388,6 @@ async function refreshSongStateFromServer(options = {}) {
         resolveInitialBootVisibility();
     } catch (error) {
         console.warn('[LYRICS] Failed to refresh song state from server:', error);
-        if (allowStartupRetry && !state.currentSongData?.videoId) {
-            scheduleStartupSongRefreshRetry(reason || 'refresh-error');
-        }
         resolveInitialBootVisibility();
     }
 }
@@ -2438,7 +2397,6 @@ function handleWebSocketMessage(message) {
     switch (message.type) {
         case 'song_updated':
             if (message.data) {
-                clearStartupSongRefreshRetry();
                 updateNowPlayingFromData(message.data, {
                     isMainApp: false,
                     onLyricsDisplay: displayLyrics,
@@ -2463,10 +2421,6 @@ function handleWebSocketMessage(message) {
                 const serverDuration = message.data.songDuration;
                 const nowMs = Date.now();
                 const sampledAtMs = Number(message.data.sampledAtMs) || nowMs;
-                const wasPaused = !!state.currentSongData?.isPaused;
-                const projectedServerElapsed = Math.max(0, serverElapsed + Math.max(0, (nowMs - sampledAtMs) / 1000));
-                const localElapsed = Number(state.currentSongData?.elapsedSeconds);
-                const safeLocalElapsed = Number.isFinite(localElapsed) ? localElapsed : null;
                 state.lastServerProgressAt = nowMs;
                 state.lastProgressUpdate = serverElapsed;
                 state.serverProgressBaseAt = sampledAtMs;
@@ -2484,22 +2438,14 @@ function handleWebSocketMessage(message) {
                 }
                 resolveInitialBootVisibility();
 
-                const shouldForceLyricUpdate =
-                    !!message.data.isPaused
-                    || wasPaused
-                    || safeLocalElapsed === null
-                    || projectedServerElapsed > (safeLocalElapsed + 0.35);
-
-                if (shouldForceLyricUpdate) {
-                    updateLyricsDisplay(projectedServerElapsed, { trustedTiming: true });
-                }
+                // Keep ongoing progress updates aligned with the old server
+                // behavior. The startup anchor is already corrected elsewhere,
+                // so the recurring progress path should use the raw sampled
+                // server time to avoid adjacent-line jitter.
+                updateLyricsDisplay(serverElapsed, { trustedTiming: true });
 
                 if (state.currentSongData) {
-                    if (safeLocalElapsed === null || shouldForceLyricUpdate) {
-                        state.currentSongData.elapsedSeconds = projectedServerElapsed;
-                    } else {
-                        state.currentSongData.elapsedSeconds = Math.max(safeLocalElapsed, projectedServerElapsed);
-                    }
+                    state.currentSongData.elapsedSeconds = serverElapsed;
                     if (serverDuration) {
                         state.currentSongData.songDuration = serverDuration;
                     }
@@ -2512,7 +2458,6 @@ function handleWebSocketMessage(message) {
 
         case 'playback_updated':
             if (message.data) {
-                clearStartupSongRefreshRetry();
                 updateNowPlayingFromData(message.data, {
                     isMainApp: false,
                     onLyricsDisplay: displayLyrics,
@@ -2605,10 +2550,7 @@ async function init() {
     if (typeof WebSocket !== 'undefined' && !state.ws) {
         initWebSocket(handleWebSocketMessage);
     }
-    refreshSongStateFromServer({
-        allowStartupRetry: true,
-        reason: 'initial-load'
-    });
+    refreshSongStateFromServer();
 
     // Apply UI scale
     applyBaseSizing();
@@ -2616,10 +2558,7 @@ async function init() {
 
     const handleVisibilityRestore = () => {
         if (document.hidden) return;
-        refreshSongStateFromServer({
-            allowStartupRetry: !state.currentSongData?.videoId,
-            reason: 'visibility-restore'
-        });
+        refreshSongStateFromServer();
         scheduleViewportSyncAndRecenter();
         requestAnimationFrame(() => retryLyricAssistFetchIfMissing('visibility-restore'));
     };
@@ -2627,10 +2566,7 @@ async function init() {
     window.addEventListener('focus', handleVisibilityRestore, { passive: true });
     window.addEventListener('pageshow', handleVisibilityRestore, { passive: true });
     window.addEventListener('lyrics-ws-open', () => {
-        refreshSongStateFromServer({
-            allowStartupRetry: !state.currentSongData?.videoId,
-            reason: 'ws-open'
-        });
+        refreshSongStateFromServer();
         requestAnimationFrame(() => retryLyricAssistFetchIfMissing('ws-open'));
     });
 
@@ -2716,7 +2652,8 @@ async function fetchLyricsCandidateOffset(offset) {
     state.lyricsCandidateOffset = Number(result.candidateOffset || 0) || 0;
     state.lyricsCandidateTotal = Number(result.totalCandidates || 0) || 0;
     displayLyrics(result.data, videoId);
-    console.log(`[LYRICS] Switched to lyric candidate ${state.lyricsCandidateOffset + 1}/${Math.max(1, state.lyricsCandidateTotal)}`);
+    const provider = String(result.provider || result.data?.provider || 'lrclib').trim().toLowerCase() || 'lrclib';
+    console.log(`[LYRICS] Switched to synced lyric candidate ${state.lyricsCandidateOffset + 1}/${Math.max(1, state.lyricsCandidateTotal)} from ${provider} (cache overwritten)`);
     return result;
 }
 

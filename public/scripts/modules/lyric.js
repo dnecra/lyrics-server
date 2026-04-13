@@ -5,7 +5,8 @@ let lastRenderedLyricsExpanded = null;
 const MUSIC_NOTE_SYMBOL = '\u266A';
 const GAP_FILL_BASE_THRESHOLD_SECONDS = 20;
 const FINAL_BLANK_TARGET_GAP_SECONDS = 5;
-const LYRICS_OFFSET_SECONDS = -1.5;
+const LYRICS_OFFSET_SECONDS = 0;
+const SYNCED_LYRIC_PARSE_OFFSET_SECONDS = 1.0;
 const LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS = 2.0;
 const LYRIC_INDEX_HYSTERESIS_SECONDS = 0;
 const AUTO_CENTER_TOLERANCE_PX = 6;
@@ -49,6 +50,43 @@ function clearPendingLyricsContainerHide() {
     if (lyricsContainerHideTimer) {
         clearTimeout(lyricsContainerHideTimer);
         lyricsContainerHideTimer = null;
+    }
+}
+
+async function fetchFreshSongElapsedForRender(expectedVideoId, fallbackElapsed = 0) {
+    const normalizedExpectedVideoId = (expectedVideoId === undefined || expectedVideoId === null)
+        ? ''
+        : String(expectedVideoId).trim();
+    const fallback = Number.isFinite(Number(fallbackElapsed)) ? Math.max(0, Number(fallbackElapsed)) : 0;
+    if (!normalizedExpectedVideoId) return fallback;
+
+    try {
+        const response = await fetch(`${API_URL}/song`, { cache: 'no-store' });
+        if (!response.ok) return fallback;
+
+        const payload = await response.json().catch(() => null);
+        const payloadVideoId = String(payload?.videoId || '').trim();
+        if (!payloadVideoId || payloadVideoId !== normalizedExpectedVideoId) {
+            return fallback;
+        }
+
+        const elapsed = Number(payload?.elapsedSeconds);
+        if (!Number.isFinite(elapsed)) return fallback;
+
+        if (state.currentSongData && String(state.currentSongData.videoId || '').trim() === normalizedExpectedVideoId) {
+            const localElapsed = Number(state.currentSongData.elapsedSeconds);
+            const safeLocalElapsed = Number.isFinite(localElapsed) ? Math.max(0, localElapsed) : 0;
+            const nextElapsed = Math.max(safeLocalElapsed, elapsed);
+            state.currentSongData = {
+                ...state.currentSongData,
+                ...payload,
+                elapsedSeconds: nextElapsed
+            };
+        }
+
+        return Math.max(fallback, elapsed);
+    } catch (_) {
+        return fallback;
     }
 }
 
@@ -780,6 +818,8 @@ export async function fetchLyrics(artist, title, album = '', duration = 0, onSuc
         }
 
         const data = result.data;
+        const provider = String(result.provider || data.provider || 'lrclib').trim().toLowerCase() || 'lrclib';
+        console.log(`[LYRICS] Server selected provider: ${provider}${result.cached ? ' (cache)' : ''}`);
         if (!isFetchStillValid()) {
             if (!isSameSong()) {
                 console.log('[LYRICS] Fetch completed but song changed; ignoring result');
@@ -1245,7 +1285,7 @@ function parseSyncedLyrics(syncedSource) {
                 const text = (match[4] || '').toString();
                 const rawTime = (min * 60) + sec + (ms / divisor);
                 return createLyricLine({
-                    time: rawTime,
+                    time: rawTime - SYNCED_LYRIC_PARSE_OFFSET_SECONDS,
                     rawTime,
                     text,
                     sourceIndex
@@ -1496,12 +1536,18 @@ animateOutLyrics().then(() => {
                 refreshLyricLineElements();
 
                 if (lyricsContainer) lyricsContainer.classList.remove('plain-mode');
-                const finalizeLyricsReveal = () => {
+                const finalizeLyricsReveal = async () => {
                     if (!isFetchStillValid() || !isRenderStillCurrent()) return;
 
-                    const currentTime = (state.currentSongData && typeof state.currentSongData.elapsedSeconds === 'number')
+                    const localCurrentTime = (state.currentSongData && typeof state.currentSongData.elapsedSeconds === 'number')
                         ? state.currentSongData.elapsedSeconds
                         : 0;
+                    const fetchedCurrentTime = await fetchFreshSongElapsedForRender(
+                        state.currentVideoId,
+                        localCurrentTime
+                    );
+                    if (!isFetchStillValid() || !isRenderStillCurrent()) return;
+                    const currentTime = Math.max(localCurrentTime, fetchedCurrentTime);
 
                     if (isFetchStillValid() && isRenderStillCurrent()) {
                         if (lyricsLoadingEl) lyricsLoadingEl.classList.remove('active');
@@ -1524,6 +1570,11 @@ animateOutLyrics().then(() => {
                         }
                     }
 
+                    // When lyrics finish mounting mid-song, keep the most advanced
+                    // elapsed time we already know locally. A fresh /song response
+                    // can legitimately lag behind the websocket/local progress path
+                    // by a tick, and forcing that older value on first paint is what
+                    // makes the initial line appear late until the next playback event.
                     updateLyricsDisplay(currentTime);
 
                     if (setLastFetched) {
@@ -1534,7 +1585,7 @@ animateOutLyrics().then(() => {
                     console.log(`[${logTag}] Lyrics loaded and displayed (synced)`);
                 };
 
-                finalizeLyricsReveal();
+                void finalizeLyricsReveal();
                 return;
             }
 
