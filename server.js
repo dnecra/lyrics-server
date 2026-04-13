@@ -160,12 +160,18 @@ app.get('/api/v1/lyrics', async (c) => {
         const title = c.req.query('title');
         const album = c.req.query('album') || '';
         const duration = parseFloat(c.req.query('duration') || '0');
+        const translationExcludedLanguages = String(c.req.query('translationExclude') || '')
+            .split(/[,\s]+/g)
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean);
 
         if (!videoId || !artist || !title) {
             return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
         }
 
-        const result = await fetchLyrics(videoId, artist, title, album, duration, broadcast);
+        const result = await fetchLyrics(videoId, artist, title, album, duration, broadcast, {
+            excludedLanguages: translationExcludedLanguages
+        });
         if (result.success) {
             return c.json(result);
         }
@@ -185,12 +191,18 @@ app.get('/api/v1/lyrics/candidate', async (c) => {
         const album = c.req.query('album') || '';
         const duration = parseFloat(c.req.query('duration') || '0');
         const offset = parseInt(c.req.query('offset') || '0', 10);
+        const translationExcludedLanguages = String(c.req.query('translationExclude') || '')
+            .split(/[,\s]+/g)
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean);
 
         if (!videoId || !artist || !title) {
             return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
         }
 
-        const result = await fetchLyricsCandidate(videoId, artist, title, album, duration, offset, broadcast);
+        const result = await fetchLyricsCandidate(videoId, artist, title, album, duration, offset, broadcast, {
+            excludedLanguages: translationExcludedLanguages
+        });
         if (result.success) {
             return c.json(result);
         }

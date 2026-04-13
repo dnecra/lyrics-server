@@ -738,12 +738,16 @@ export async function fetchLyrics(artist, title, album = '', duration = 0, onSuc
     };
 
     try {
+        const excludedLanguages = Array.isArray(window.__lyricTranslationExcludedLanguages)
+            ? window.__lyricTranslationExcludedLanguages
+            : [];
         const params = new URLSearchParams({
             videoId: fetchVideoId,
             artist: artist,
             title: title,
             album: album || '',
-            duration: duration.toString()
+            duration: duration.toString(),
+            translationExclude: excludedLanguages.join(',')
         });
 
         const response = await fetch(`${API_URL}/lyrics?${params.toString()}`, {

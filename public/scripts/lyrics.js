@@ -319,6 +319,7 @@ let lowResLyricFontSizeOffset = 0;
 let currentLyricFontWeightPreset = DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET;
 let currentLyricBackgroundPreset = DEFAULT_LYRIC_BACKGROUND_PRESET;
 let currentLyricRomanizationMode = 'both';
+let currentLyricTranslationExcludedLanguages = [];
 const lyricControlLabelTouched = {
     mode: false,
     font: false,
@@ -338,6 +339,50 @@ let currentLyricsMaxWidthVw = DEFAULT_LYRICS_PAGE_WIDTH_PERCENT;
 let currentLyricsDisplayMode = DEFAULT_LYRICS_PAGE_DISPLAY_MODE;
 let lyricsWidthDragActive = false;
 let lyricsWidthDragHandleSide = null;
+
+function normalizeTranslationExcludedLanguages(value) {
+    const values = Array.isArray(value)
+        ? value
+        : String(value || '')
+            .split(/[,\s]+/g)
+            .filter(Boolean);
+
+    return Array.from(new Set(values
+        .map((entry) => String(entry || '').trim().toLowerCase())
+        .filter(Boolean)));
+}
+
+function getLyricTranslationExcludedLanguages() {
+    return [...currentLyricTranslationExcludedLanguages];
+}
+
+function isTranslationLanguageExcluded(languageCode) {
+    const normalized = String(languageCode || '').trim().toLowerCase();
+    return !!normalized && currentLyricTranslationExcludedLanguages.includes(normalized);
+}
+
+function sanitizeLyricsTranslationPayload(data) {
+    if (!data || typeof data !== 'object') return data;
+    const translationLanguage = data.translationLanguage && typeof data.translationLanguage === 'object'
+        ? data.translationLanguage
+        : null;
+    const detectedLanguage = String(translationLanguage?.detectedLanguage || '').trim().toLowerCase();
+    const forceTranslate = translationLanguage?.forceTranslate === true;
+    if (!detectedLanguage || forceTranslate || !isTranslationLanguageExcluded(detectedLanguage)) {
+        return data;
+    }
+
+    const sanitized = { ...data };
+    delete sanitized.translatedSyncedLyrics;
+    delete sanitized.englishSyncedLyrics;
+    sanitized.translationState = 'excluded';
+    sanitized.translationLanguage = {
+        ...translationLanguage,
+        isExcluded: true,
+        excludedLanguages: getLyricTranslationExcludedLanguages()
+    };
+    return sanitized;
+}
 let isWidthShortcutHeld = false;
 let isWidthControlHovered = false;
 let isLyricsWindowHovered = false;
@@ -1087,6 +1132,7 @@ function saveSettings() {
         lyricFontWeightPreset: currentLyricFontWeightPreset,
         lyricBackgroundPreset: currentLyricBackgroundPreset,
         lyricRomanizationMode: currentLyricRomanizationMode,
+        lyricTranslationExcludedLanguages: currentLyricTranslationExcludedLanguages,
         dynamicThemeEnabled: getLyricDynamicThemeEnabled(),
         themeColorIndex: currentManualLyricThemeColorIndex,
     };
@@ -1901,6 +1947,8 @@ function applySavedSettings() {
         });
         applyLyricFontWeightPreset(settings.lyricFontWeightPreset || DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
+        currentLyricTranslationExcludedLanguages = normalizeTranslationExcludedLanguages(settings.lyricTranslationExcludedLanguages);
+        window.__lyricTranslationExcludedLanguages = getLyricTranslationExcludedLanguages();
         const savedRomanizationMode = settings.lyricRomanizationMode
             || (settings.lyricTranslationEnabled === true ? 'both' : 'both');
         applyLyricRomanizationMode(savedRomanizationMode, { persist: false });
@@ -1922,6 +1970,8 @@ function applySavedSettings() {
         });
         applyLyricFontWeightPreset(DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
+        currentLyricTranslationExcludedLanguages = [];
+        window.__lyricTranslationExcludedLanguages = [];
         applyLyricRomanizationMode('both', { persist: false });
     }
 
@@ -2164,14 +2214,22 @@ function initializeLyricsWidthHandle() {
 function displayLyrics(data, fetchVideoId) {
     const normalizeVideoId = (value) => (value === undefined || value === null) ? '' : String(value).trim();
     const targetVideoId = normalizeVideoId(fetchVideoId);
-    const translationState = String(data?.translationState || '').trim().toLowerCase();
+    const safeData = sanitizeLyricsTranslationPayload(data);
+    const translationState = String(safeData?.translationState || '').trim().toLowerCase();
+    const translationLanguage = safeData?.translationLanguage && typeof safeData.translationLanguage === 'object'
+        ? safeData.translationLanguage
+        : null;
     if (state.currentSongData && normalizeVideoId(state.currentVideoId) === targetVideoId) {
         state.currentSongData = {
             ...state.currentSongData,
-            lyricsTranslationState: translationState || state.currentSongData.lyricsTranslationState || ''
+            lyricsTranslationState: translationState || state.currentSongData.lyricsTranslationState || '',
+            lyricsTranslationLanguage: translationLanguage || state.currentSongData.lyricsTranslationLanguage || null
         };
     }
-    const result = displayLyricsUI(data, {
+    if (translationLanguage?.detectedLanguage) {
+        console.log(`[LYRICS] Translation language detected: ${translationLanguage.detectedLanguage}${translationLanguage.isExcluded ? ' (excluded)' : ''}`);
+    }
+    const result = displayLyricsUI(safeData, {
         fetchVideoId,
         validateFetch: () => {
             const currentVideoId = normalizeVideoId(state.currentVideoId);
@@ -2201,6 +2259,57 @@ function hideLyrics() {
         logTag: 'LYRICS'
     });
     return result;
+}
+
+function refreshCurrentLyricsTranslationPreference(reason = 'translation-preference-change') {
+    const songData = state.currentSongData;
+    const videoId = typeof songData?.videoId === 'string' ? songData.videoId.trim() : '';
+    const artist = typeof songData?.artist === 'string' ? songData.artist.trim() : '';
+    const title = typeof songData?.title === 'string' ? songData.title.trim() : '';
+    if (!videoId || !artist || !title) return null;
+
+    if ((Number(state.lyricsCandidateOffset || 0) || 0) > 0) {
+        console.log(`[LYRICS] Refreshing lyric candidate for ${reason}`);
+        return fetchLyricsCandidateOffset(Number(state.lyricsCandidateOffset || 0) || 0);
+    }
+
+    console.log(`[LYRICS] Refreshing lyrics for ${reason}`);
+    return fetchLyrics(
+        artist,
+        title,
+        songData.album || '',
+        songData.songDuration || 0,
+        displayLyrics,
+        hideLyrics
+    );
+}
+
+function setLyricTranslationExcludedLanguages(languages, { persist = true, refresh = true } = {}) {
+    currentLyricTranslationExcludedLanguages = normalizeTranslationExcludedLanguages(languages);
+    window.__lyricTranslationExcludedLanguages = getLyricTranslationExcludedLanguages();
+    if (persist) saveSettings();
+    if (refresh) {
+        Promise.resolve(refreshCurrentLyricsTranslationPreference('translation-exclusion-update')).catch((error) => {
+            console.warn('[LYRICS] Failed to refresh lyrics after translation exclusion update:', error);
+        });
+    }
+    console.log('[LYRICS] Translation exclusions:', currentLyricTranslationExcludedLanguages);
+    return getLyricTranslationExcludedLanguages();
+}
+
+function toggleLyricTranslationExcludedLanguage(languageCode, options = {}) {
+    const normalized = normalizeTranslationExcludedLanguages([languageCode])[0];
+    if (!normalized) {
+        return getLyricTranslationExcludedLanguages();
+    }
+
+    const next = new Set(currentLyricTranslationExcludedLanguages);
+    if (next.has(normalized)) {
+        next.delete(normalized);
+    } else {
+        next.add(normalized);
+    }
+    return setLyricTranslationExcludedLanguages(Array.from(next), options);
 }
 
 function retryLyricAssistFetchIfMissing(reason = '') {
@@ -2592,7 +2701,8 @@ async function fetchLyricsCandidateOffset(offset) {
         title,
         album: songData.album || '',
         duration: String(songData.songDuration || 0),
-        offset: String(Math.max(0, Number(offset) || 0))
+        offset: String(Math.max(0, Number(offset) || 0)),
+        translationExclude: getLyricTranslationExcludedLanguages().join(',')
     });
 
     const response = await fetch(`${API_URL}/lyrics/candidate?${params.toString()}`, {
@@ -2615,6 +2725,28 @@ window.swapLyricsCandidate = async function() {
     const total = Number(state.lyricsCandidateTotal || 0) || 0;
     const nextOffset = total > 0 ? ((currentOffset + 1) % total) : (currentOffset + 1);
     return fetchLyricsCandidateOffset(nextOffset);
+};
+
+window.getLyricTranslationExcludedLanguages = function() {
+    return getLyricTranslationExcludedLanguages();
+};
+
+window.setLyricTranslationExcludedLanguages = function(languages) {
+    return setLyricTranslationExcludedLanguages(languages);
+};
+
+window.toggleLyricTranslationExcludedLanguage = function(languageCode) {
+    return toggleLyricTranslationExcludedLanguage(languageCode);
+};
+
+window.toggleLyricTranslationExclude = window.toggleLyricTranslationExcludedLanguage;
+
+window.getCurrentLyricTranslationLanguageInfo = function() {
+    return state.currentSongData?.lyricsTranslationLanguage || null;
+};
+
+window.getLyricDetectedLanguage = function() {
+    return String(state.currentSongData?.lyricsTranslationLanguage?.detectedLanguage || '').trim().toLowerCase();
 };
 
 // Toggle function to manually hide/show layout (callable from external app)
