@@ -806,9 +806,9 @@ export const LYRIC_DISPLAY_MODE_VISIBLE_LINES = {
 export const LYRIC_DISPLAY_MODE_ORDER = ['scroll', 'fixed-3', 'fixed-2', 'fixed-1'];
 
 export const LYRIC_FONT_WEIGHT_PRESETS = {
-    thin: { label: 'Thin', inactive: 400, active: 400 },
-    regular: { label: 'Regular', inactive: 500, active: 500 },
-    bold: { label: 'Bold', inactive: 700, active: 700 }
+    thin: { label: 'Thin', main: 400, translation: 400 },
+    regular: { label: 'Regular', main: 600, translation: 500 },
+    bold: { label: 'Bold', main: 800, translation: 600 }
 };
 export const LYRIC_FONT_WEIGHT_ORDER = ['thin', 'regular', 'bold'];
 

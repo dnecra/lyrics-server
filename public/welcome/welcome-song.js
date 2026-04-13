@@ -484,6 +484,14 @@ function getCssPercentVar(name, fallback) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getCssPxVar(name, fallback) {
+    const root = document.documentElement;
+    if (!root) return fallback;
+    const raw = getComputedStyle(root).getPropertyValue(name).trim();
+    const parsed = parseFloat(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function getConfiguredLyricsMinWidthVw() {
     if (configuredLyricsMinWidthVwCache == null) {
         configuredLyricsMinWidthVwCache = getAuthoredRootCssPercentVar(
@@ -610,10 +618,11 @@ function syncLyricsViewportHeight() {
         return line.getBoundingClientRect().height + Math.max(0, parseFloat(styles.marginTop) || 0) + Math.max(0, parseFloat(styles.marginBottom) || 0);
     }).filter(v => Number.isFinite(v) && v > 0);
     const fallbackLineHeight = parseFloat(rootStyles.getPropertyValue('--lyric-line-height')) || 40;
-    const fallbackGap = parseFloat(rootStyles.getPropertyValue('--lyrics-line-outer-gap')) || 16;
+    const fallbackGap = parseFloat(rootStyles.getPropertyValue('--lyrics-line-gap'))
+        || parseFloat(rootStyles.getPropertyValue('--lyrics-line-outer-gap'))
+        || 16;
     const singleRowHeight = measuredRowHeights.length > 0 ? Math.max(...measuredRowHeights) : (fallbackLineHeight + fallbackGap);
     root.style.setProperty('--lyrics-viewport-height', `${Math.max(1, Math.round(singleRowHeight * visibleLines))}px`);
-    root.style.setProperty('--lyrics-edge-fade-size', `${Math.max(12, Math.min(160, Math.round(singleRowHeight * 0.9)))}px`);
 }
 
 function syncCenterViewportMaxHeight() {
@@ -758,9 +767,11 @@ function applyLyricSizing() {
     const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
     const priority = (viewportWidth <= 768 || isDownloadMobilePreview()) ? 'important' : '';
     const boostedFontSize = viewportWidth <= 768 ? effectiveFontSize + 16 : effectiveFontSize;
+    const baseGap = getCssPxVar('--lyrics-line-gap', 16);
+    const outerGap = Math.max(8, Math.round((boostedFontSize / DEFAULT_FONT_SIZE) * baseGap));
     document.documentElement.style.setProperty('--lyric-font-size', `${boostedFontSize}px`, priority);
     document.documentElement.style.setProperty('--lyric-line-height', `${Math.round(boostedFontSize * 1.16)}px`, priority);
-    document.documentElement.style.setProperty('--lyrics-line-outer-gap', `${Math.max(8, Math.round(boostedFontSize * 0.2))}px`, priority);
+    document.documentElement.style.setProperty('--lyrics-line-outer-gap', `${outerGap}px`, priority);
     document.documentElement.style.setProperty('--lyric-romanized-size', `${boostedFontSize * 0.6}px`, priority);
     syncCenterViewportMaxHeight();
     scheduleViewportSyncAndRecenter();
@@ -800,23 +811,57 @@ function normalizeLyricRomanizationMode(mode) {
     return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'both';
 }
 
+function hasRenderedRomanizedLines() {
+    return !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
+}
+
+function hasRenderedTranslationLines() {
+    return !!document.querySelector('#synced-lyrics .lyric-translation, #plain-lyrics .lyric-translation');
+}
+
+function getLyricAssistCapabilities() {
+    return {
+        hasRomanized: hasRenderedRomanizedLines(),
+        hasTranslation: hasRenderedTranslationLines()
+    };
+}
+
+function getLyricAssistToggleOrder() {
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    if (hasRomanized && hasTranslation) return ['romanized', 'both', 'off'];
+    if (hasTranslation) return ['both', 'off'];
+    if (hasRomanized) return ['romanized', 'off'];
+    return ['both', 'off'];
+}
+
+function normalizeLyricAssistModeForAvailableContent(mode) {
+    const normalized = normalizeLyricRomanizationMode(mode);
+    const order = getLyricAssistToggleOrder();
+    if (order.includes(normalized)) return normalized;
+    return order[0] || 'off';
+}
+
 function applyLyricRomanizationMode(mode, { persist = true } = {}) {
-    currentLyricRomanizationMode = normalizeLyricRomanizationMode(mode);
+    currentLyricRomanizationMode = normalizeLyricAssistModeForAvailableContent(mode);
     const root = document.documentElement;
     root.classList.toggle('lyrics-translation-hidden', currentLyricRomanizationMode !== 'both');
     root.classList.toggle('lyrics-romanization-off', currentLyricRomanizationMode === 'off');
     updateLyricsTranslationToggleLabel();
+    requestAnimationFrame(() => {
+        scheduleViewportSyncAndRecenter();
+    });
     if (persist) saveSettings();
 }
 
-function hasVisibleRomanizedLyrics() {
-    return !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
+function hasVisibleLyricAssistLines() {
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    return hasRomanized || hasTranslation;
 }
 
 function syncTranslationToggleVisibility() {
     const btn = document.getElementById('lyrics-translation-toggle');
     if (!btn) return;
-    const visible = hasVisibleRomanizedLyrics();
+    const visible = hasVisibleLyricAssistLines();
     btn.hidden = !visible;
     btn.style.display = visible ? '' : 'none';
     btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
@@ -973,20 +1018,35 @@ function updateLyricsTranslationToggleLabel() {
     if (!btn) return;
     syncTranslationToggleVisibility();
     if (btn.hidden) return;
-    const mode = normalizeLyricRomanizationMode(currentLyricRomanizationMode);
-    const labelMap = {
-        romanized: 'Romanized',
-        both: 'Translated',
-        off: 'Off'
-    };
-    const titleMap = {
-        romanized: 'Romanization: On',
-        both: 'Romanization + Translation: On',
-        off: 'Romanization + Translation: Off'
-    };
-    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanization');
-    btn.setAttribute('aria-label', `Cycle lyric romanization mode (current: ${labelMap[mode]})`);
-    btn.setAttribute('title', titleMap[mode]);
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    const isTranslationOnly = hasTranslation && !hasRomanized;
+    const mode = normalizeLyricAssistModeForAvailableContent(currentLyricRomanizationMode);
+    currentLyricRomanizationMode = mode;
+
+    const labelMap = isTranslationOnly
+        ? {
+            both: 'Translated',
+            off: 'Off'
+        }
+        : {
+            romanized: 'Romanized',
+            both: 'Translated',
+            off: 'Off'
+        };
+    const titleMap = isTranslationOnly
+        ? {
+            both: 'Translation: On',
+            off: 'Translation: Off'
+        }
+        : {
+            romanized: 'Romanization: On',
+            both: 'Romanization + Translation: On',
+            off: 'Romanization + Translation: Off'
+        };
+    const baseLabel = isTranslationOnly ? 'Translation' : 'Romanization';
+    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? (labelMap[mode] || 'Off') : baseLabel);
+    btn.setAttribute('aria-label', `Cycle lyric ${isTranslationOnly ? 'translation' : 'romanization'} mode (current: ${labelMap[mode] || 'Off'})`);
+    btn.setAttribute('title', titleMap[mode] || `${baseLabel}: Off`);
     syncWidthControlButtonMetrics();
 }
 
@@ -1087,8 +1147,9 @@ function applyLyricFontWeightPreset(preset, { persist = true } = {}) {
     const normalized = normalizeLyricFontWeightPreset(preset);
     const config = LYRIC_FONT_WEIGHT_PRESETS[normalized] || LYRIC_FONT_WEIGHT_PRESETS.regular;
     currentLyricFontWeightPreset = normalized;
-    document.documentElement.style.setProperty('--lyrics-inactive-font-weight', String(config.inactive));
-    document.documentElement.style.setProperty('--lyrics-active-font-weight', String(config.active));
+    document.documentElement.style.setProperty('--lyrics-inactive-font-weight', String(config.main));
+    document.documentElement.style.setProperty('--lyrics-active-font-weight', String(config.main));
+    document.documentElement.style.setProperty('--lyrics-translation-font-weight', String(config.translation));
     updateLyricsFontWeightToggleLabel();
     if (persist) saveSettings();
 }
@@ -1679,8 +1740,8 @@ function cycleLyricThemeColorButton() {
 
 function toggleLyricTranslationButton() {
     lyricControlLabelTouched.translation = true;
-    const order = ['romanized', 'both', 'off'];
-    const currentIndex = order.indexOf(normalizeLyricRomanizationMode(currentLyricRomanizationMode));
+    const order = getLyricAssistToggleOrder();
+    const currentIndex = order.indexOf(normalizeLyricAssistModeForAvailableContent(currentLyricRomanizationMode));
     const nextMode = order[(currentIndex + 1) % order.length];
     applyLyricRomanizationMode(nextMode, { persist: true });
 }

@@ -6,11 +6,12 @@ export const MAX_RECONNECT_ATTEMPTS = 10;
 export const state = {
     currentVideoId: null,
     currentLyrics: [],
-    lyricsOffset: 0,
     isSyncedLyrics: false,
     lastFetchedVideoId: null,
     currentFetchVideoId: null,
     lastLyricsRequestKey: null,
+    lyricsCandidateOffset: 0,
+    lyricsCandidateTotal: 0,
     isPaused: false,
     currentSongData: null,
     currentPlayingIndex: null,
@@ -63,10 +64,11 @@ export const state = {
 export function resetSongState() {
     state.currentLyrics = [];
     state.isSyncedLyrics = false;
-    state.lyricsOffset = 0;
     state.lastFetchedVideoId = null;
     state.currentFetchVideoId = null;
     state.lastLyricsRequestKey = null;
+    state.lyricsCandidateOffset = 0;
+    state.lyricsCandidateTotal = 0;
     state.lastProgressUpdate = 0;
     state.lastServerProgressAt = 0;
     state.serverProgressBaseAt = 0;

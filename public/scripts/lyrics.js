@@ -33,7 +33,7 @@ import { canonicalizeText, escapeHtml, escapeHtmlAttribute } from './modules/uti
 
 // Enable "hide lines after active blank-note" only for dedicated lyrics page.
 window.__lyricsBlankCutoffEnabled = true;
-window.__lyricsLeadingGhostLinesCount = 1;
+window.__lyricsLeadingGhostLinesCount = 0;
 window.__lyricsLeadingSpacingGhostLinesCount = 0;
 
 // Lyrics app specific state
@@ -355,9 +355,16 @@ let windowResizeRaf = null;
 let windowResizeSettleTimeout = null;
 let deferredScrollCenterTimeout = null;
 let revealScrollCenterToken = 0;
+let lyricAssistRetryTimeout = null;
+let lyricAssistRetryVideoId = '';
+let lyricAssistRetryCount = 0;
+let startupSongRefreshRetryTimeout = null;
+let startupSongRefreshAttempts = 0;
 let configuredLyricsMinWidthVwCache = null;
 let configuredLyricsMaxWidthVwCache = null;
 const WHEEL_RESIZE_ACTIVE_LINE_FREEZE_MS = 650;
+const STARTUP_SONG_REFRESH_RETRY_DELAY_MS = 1200;
+const STARTUP_SONG_REFRESH_MAX_RETRIES = 15;
 
 function getAuthoredRootCssPercentVar(name, fallback) {
     try {
@@ -382,6 +389,14 @@ function getAuthoredRootCssPercentVar(name, fallback) {
 }
 
 function getCssPercentVar(name, fallback) {
+    const root = document.documentElement;
+    if (!root) return fallback;
+    const raw = getComputedStyle(root).getPropertyValue(name).trim();
+    const parsed = parseFloat(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getCssPxVar(name, fallback) {
     const root = document.documentElement;
     if (!root) return fallback;
     const raw = getComputedStyle(root).getPropertyValue(name).trim();
@@ -539,15 +554,21 @@ function syncLyricsViewportHeight() {
         .filter((value) => Number.isFinite(value) && value > 0);
 
     const fallbackLineHeight = parseFloat(rootStyles.getPropertyValue('--lyric-line-height')) || 40;
-    const fallbackGap = parseFloat(rootStyles.getPropertyValue('--lyrics-line-outer-gap')) || 16;
+    const fallbackGap = parseFloat(rootStyles.getPropertyValue('--lyrics-line-gap'))
+        || parseFloat(rootStyles.getPropertyValue('--lyrics-line-outer-gap'))
+        || 16;
     const singleRowHeight = measuredRowHeights.length > 0
         ? Math.max(...measuredRowHeights)
         : (fallbackLineHeight + fallbackGap);
     const viewportHeight = Math.max(1, Math.round(singleRowHeight * visibleLines));
-    const fadeSize = Math.max(12, Math.min(160, Math.round(singleRowHeight * 0.9)));
-
     root.style.setProperty('--lyrics-viewport-height', `${viewportHeight}px`);
-    root.style.setProperty('--lyrics-edge-fade-size', `${fadeSize}px`);
+
+    // Keep edge feather proportional to the live viewport height so resizing
+    // lyric font size does not leave the mask looking stale or overextended.
+    const edgeFadeSize = Math.max(24, Math.min(128, Math.round(viewportHeight * 0.22)));
+    const edgeFadeSizeTop = Math.max(edgeFadeSize, Math.round(edgeFadeSize * 1.5));
+    root.style.setProperty('--lyrics-edge-fade-size', `${edgeFadeSize}px`);
+    root.style.setProperty('--lyrics-edge-fade-size-top', `${edgeFadeSizeTop}px`);
 }
 
 function syncCenterViewportMaxHeight() {
@@ -673,7 +694,14 @@ function captureActiveLyricAnchor() {
 
     const lineRect = activeLine.getBoundingClientRect();
     const scrollRect = scrollContainer.getBoundingClientRect();
-    const centerOffset = (lineRect.top - scrollRect.top) + (lineRect.height / 2);
+    // Use single-row height so wrapped multi-line blocks anchor to their first
+    // row — consistent with getStableCenterTargetTop in lyric.js.
+    const computedStyle = window.getComputedStyle(activeLine);
+    const singleRowHeight = Math.min(
+        parseFloat(computedStyle.lineHeight) || lineRect.height,
+        lineRect.height
+    );
+    const centerOffset = (lineRect.top - scrollRect.top) + (singleRowHeight / 2);
     const index = Number.parseInt(activeLine.dataset.index || '-1', 10);
     if (!Number.isFinite(index) || index < 0) return null;
 
@@ -703,7 +731,12 @@ function restoreActiveLyricAnchor(anchor) {
 
     const lineRect = lineElement.getBoundingClientRect();
     const scrollRect = scrollContainer.getBoundingClientRect();
-    const currentCenterOffset = (lineRect.top - scrollRect.top) + (lineRect.height / 2);
+    const computedStyle = window.getComputedStyle(lineElement);
+    const singleRowHeight = Math.min(
+        parseFloat(computedStyle.lineHeight) || lineRect.height,
+        lineRect.height
+    );
+    const currentCenterOffset = (lineRect.top - scrollRect.top) + (singleRowHeight / 2);
     const delta = currentCenterOffset - anchor.centerOffset;
     if (Math.abs(delta) <= 0.5) return;
 
@@ -917,14 +950,17 @@ function applyLyricSizing({ recenter = true } = {}) {
         effectiveFontSize += 4;
     }
     const lineHeight = Math.round(effectiveFontSize * 1.16);
-    const outerGap = Math.max(8, Math.round(effectiveFontSize * 0.2));
+    const baseGap = getCssPxVar('--lyrics-line-gap', 16);
+    const outerGap = Math.max(8, Math.round((effectiveFontSize / DEFAULT_FONT_SIZE) * baseGap));
     const romanizedSize = effectiveFontSize * 0.6;
 
     if (applyLyricSizingRaf) cancelAnimationFrame(applyLyricSizingRaf);
     applyLyricSizingRaf = requestAnimationFrame(() => {
         applyLyricSizingRaf = null;
+        const lineHeightRatio = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lyric-line-height-ratio')) || 0.5;
         document.documentElement.style.setProperty('--lyric-font-size', `${effectiveFontSize}px`, cssPriority);
         document.documentElement.style.setProperty('--lyric-line-height', `${lineHeight}px`, cssPriority);
+        document.documentElement.style.setProperty('--lyric-line-height-actual', `${Math.round(lineHeight * lineHeightRatio)}px`, cssPriority);
         document.documentElement.style.setProperty('--lyrics-line-outer-gap', `${outerGap}px`, cssPriority);
         document.documentElement.style.setProperty('--lyric-romanized-size', `${romanizedSize}px`, cssPriority);
         syncCenterViewportMaxHeight();
@@ -1085,23 +1121,57 @@ function normalizeLyricRomanizationMode(mode) {
     return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'both';
 }
 
+function hasRenderedRomanizedLines() {
+    return !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
+}
+
+function hasRenderedTranslationLines() {
+    return !!document.querySelector('#synced-lyrics .lyric-translation, #plain-lyrics .lyric-translation');
+}
+
+function getLyricAssistCapabilities() {
+    return {
+        hasRomanized: hasRenderedRomanizedLines(),
+        hasTranslation: hasRenderedTranslationLines()
+    };
+}
+
+function getLyricAssistToggleOrder() {
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    if (hasRomanized && hasTranslation) return ['romanized', 'both', 'off'];
+    if (hasTranslation) return ['both', 'off'];
+    if (hasRomanized) return ['romanized', 'off'];
+    return ['both', 'off'];
+}
+
+function normalizeLyricAssistModeForAvailableContent(mode) {
+    const normalized = normalizeLyricRomanizationMode(mode);
+    const order = getLyricAssistToggleOrder();
+    if (order.includes(normalized)) return normalized;
+    return order[0] || 'off';
+}
+
 function applyLyricRomanizationMode(mode, { persist = true } = {}) {
-    currentLyricRomanizationMode = normalizeLyricRomanizationMode(mode);
+    currentLyricRomanizationMode = normalizeLyricAssistModeForAvailableContent(mode);
     const root = document.documentElement;
     root.classList.toggle('lyrics-translation-hidden', currentLyricRomanizationMode !== 'both');
     root.classList.toggle('lyrics-romanization-off', currentLyricRomanizationMode === 'off');
     updateLyricsTranslationToggleLabel();
+    requestAnimationFrame(() => {
+        scheduleViewportSyncAndRecenter();
+    });
     if (persist) saveSettings();
 }
 
-function hasVisibleRomanizedLyrics() {
-    return !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
+function hasVisibleLyricAssistLines() {
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    return hasRomanized || hasTranslation;
 }
 
 function syncTranslationToggleVisibility() {
     const btn = document.getElementById('lyrics-translation-toggle');
     if (!btn) return;
-    const visible = hasVisibleRomanizedLyrics();
+    const visible = hasVisibleLyricAssistLines();
     btn.hidden = !visible;
     btn.style.display = visible ? '' : 'none';
     btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
@@ -1277,20 +1347,35 @@ function updateLyricsTranslationToggleLabel() {
     if (!btn) return;
     syncTranslationToggleVisibility();
     if (btn.hidden) return;
-    const mode = normalizeLyricRomanizationMode(currentLyricRomanizationMode);
-    const labelMap = {
-        romanized: 'Romanized',
-        both: 'Translated',
-        off: 'Off'
-    };
-    const titleMap = {
-        romanized: 'Romanization: On',
-        both: 'Romanization + Translation: On',
-        off: 'Romanization + Translation: Off'
-    };
-    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? labelMap[mode] : 'Romanization');
-    btn.setAttribute('aria-label', `Cycle lyric romanization mode (current: ${labelMap[mode]})`);
-    btn.setAttribute('title', titleMap[mode]);
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    const isTranslationOnly = hasTranslation && !hasRomanized;
+    const mode = normalizeLyricAssistModeForAvailableContent(currentLyricRomanizationMode);
+    currentLyricRomanizationMode = mode;
+
+    const labelMap = isTranslationOnly
+        ? {
+            both: 'Translated',
+            off: 'Off'
+        }
+        : {
+            romanized: 'Romanized',
+            both: 'Translated',
+            off: 'Off'
+        };
+    const titleMap = isTranslationOnly
+        ? {
+            both: 'Translation: On',
+            off: 'Translation: Off'
+        }
+        : {
+            romanized: 'Romanization: On',
+            both: 'Romanization + Translation: On',
+            off: 'Romanization + Translation: Off'
+        };
+    const baseLabel = isTranslationOnly ? 'Translation' : 'Romanization';
+    setLyricButtonLabel(btn, lyricControlLabelTouched.translation ? (labelMap[mode] || 'Off') : baseLabel);
+    btn.setAttribute('aria-label', `Cycle lyric ${isTranslationOnly ? 'translation' : 'romanization'} mode (current: ${labelMap[mode] || 'Off'})`);
+    btn.setAttribute('title', titleMap[mode] || `${baseLabel}: Off`);
     syncWidthControlButtonMetrics();
 }
 
@@ -1377,8 +1462,8 @@ function cycleLyricThemeColorButton() {
 
 function toggleLyricTranslationButton() {
     lyricControlLabelTouched.translation = true;
-    const order = ['romanized', 'both', 'off'];
-    const currentIndex = order.indexOf(normalizeLyricRomanizationMode(currentLyricRomanizationMode));
+    const order = getLyricAssistToggleOrder();
+    const currentIndex = order.indexOf(normalizeLyricAssistModeForAvailableContent(currentLyricRomanizationMode));
     const nextMode = order[(currentIndex + 1) % order.length];
     applyLyricRomanizationMode(nextMode, { persist: true });
 }
@@ -1459,8 +1544,9 @@ function applyLyricFontWeightPreset(preset, { persist = true } = {}) {
     const normalized = normalizeLyricFontWeightPreset(preset);
     const config = LYRIC_FONT_WEIGHT_PRESETS[normalized] || LYRIC_FONT_WEIGHT_PRESETS.regular;
     currentLyricFontWeightPreset = normalized;
-    document.documentElement.style.setProperty('--lyrics-inactive-font-weight', String(config.inactive));
-    document.documentElement.style.setProperty('--lyrics-active-font-weight', String(config.active));
+    document.documentElement.style.setProperty('--lyrics-inactive-font-weight', String(config.main));
+    document.documentElement.style.setProperty('--lyrics-active-font-weight', String(config.main));
+    document.documentElement.style.setProperty('--lyrics-translation-font-weight', String(config.translation));
     updateLyricsFontWeightToggleLabel();
     if (persist) saveSettings();
 }
@@ -2083,6 +2169,13 @@ function initializeLyricsWidthHandle() {
 function displayLyrics(data, fetchVideoId) {
     const normalizeVideoId = (value) => (value === undefined || value === null) ? '' : String(value).trim();
     const targetVideoId = normalizeVideoId(fetchVideoId);
+    const translationState = String(data?.translationState || '').trim().toLowerCase();
+    if (state.currentSongData && normalizeVideoId(state.currentVideoId) === targetVideoId) {
+        state.currentSongData = {
+            ...state.currentSongData,
+            lyricsTranslationState: translationState || state.currentSongData.lyricsTranslationState || ''
+        };
+    }
     const result = displayLyricsUI(data, {
         fetchVideoId,
         validateFetch: () => {
@@ -2097,6 +2190,13 @@ function displayLyrics(data, fetchVideoId) {
     });
     requestAnimationFrame(() => runViewportSyncAndRecenter());
     scheduleScrollCenterAfterReveal();
+    requestAnimationFrame(() => {
+        if (normalizeVideoId(state.currentVideoId) !== targetVideoId) return;
+        const hasRomanizableLines = !!document.querySelector('#synced-lyrics .lyric-line.romanizable, #plain-lyrics .lyric-line.romanizable');
+        const missingRomanization = hasRomanizableLines && !hasRenderedRomanizedLines();
+        if (!missingRomanization) return;
+        scheduleLyricAssistRecovery('post-render', 1600);
+    });
     return result;
 }
 
@@ -2108,7 +2208,7 @@ function hideLyrics() {
     return result;
 }
 
-function retryRomanizationFetchIfMissing(reason = '') {
+function retryLyricAssistFetchIfMissing(reason = '') {
     const songData = state.currentSongData;
     const videoId = typeof songData?.videoId === 'string' ? songData.videoId.trim() : '';
     const artist = typeof songData?.artist === 'string' ? songData.artist.trim() : '';
@@ -2119,8 +2219,9 @@ function retryRomanizationFetchIfMissing(reason = '') {
     if (!Array.isArray(state.currentLyrics) || state.currentLyrics.length === 0) return;
 
     const hasRomanizableLines = !!document.querySelector('#synced-lyrics .lyric-line.romanizable, #plain-lyrics .lyric-line.romanizable');
-    const hasRenderedRomanized = !!document.querySelector('#synced-lyrics .romanized, #plain-lyrics .romanized');
-    if (!hasRomanizableLines || hasRenderedRomanized) return;
+    const hasRomanized = hasRenderedRomanizedLines();
+    const needsRomanizationRecovery = hasRomanizableLines && !hasRomanized;
+    if (!needsRomanizationRecovery) return;
 
     console.log(`[LYRICS] Re-fetching current song to recover missing romanized lyrics${reason ? ` (${reason})` : ''}`);
     fetchLyrics(
@@ -2133,11 +2234,61 @@ function retryRomanizationFetchIfMissing(reason = '') {
     );
 }
 
+function scheduleLyricAssistRecovery(reason = '', delayMs = 1400) {
+    const songData = state.currentSongData;
+    const videoId = typeof songData?.videoId === 'string' ? songData.videoId.trim() : '';
+    if (!videoId) return;
+
+    if (lyricAssistRetryVideoId !== videoId) {
+        lyricAssistRetryVideoId = videoId;
+        lyricAssistRetryCount = 0;
+    }
+
+    if (lyricAssistRetryCount >= 2) return;
+    if (lyricAssistRetryTimeout) {
+        clearTimeout(lyricAssistRetryTimeout);
+        lyricAssistRetryTimeout = null;
+    }
+
+    lyricAssistRetryTimeout = setTimeout(() => {
+        lyricAssistRetryTimeout = null;
+        lyricAssistRetryCount += 1;
+        retryLyricAssistFetchIfMissing(reason);
+    }, Math.max(250, Number(delayMs) || 1400));
+}
+
 function resolveInitialBootVisibility() {
     document.body?.classList.remove('lyrics-booting');
 }
 
-async function refreshSongStateFromServer() {
+function clearStartupSongRefreshRetry() {
+    if (startupSongRefreshRetryTimeout) {
+        clearTimeout(startupSongRefreshRetryTimeout);
+        startupSongRefreshRetryTimeout = null;
+    }
+    startupSongRefreshAttempts = 0;
+}
+
+function scheduleStartupSongRefreshRetry(reason = '') {
+    if (state.currentSongData?.videoId) return;
+    if (startupSongRefreshRetryTimeout) return;
+    if (startupSongRefreshAttempts >= STARTUP_SONG_REFRESH_MAX_RETRIES) return;
+
+    startupSongRefreshAttempts += 1;
+    startupSongRefreshRetryTimeout = setTimeout(() => {
+        startupSongRefreshRetryTimeout = null;
+        refreshSongStateFromServer({
+            allowStartupRetry: true,
+            reason: reason || 'startup-retry'
+        });
+    }, STARTUP_SONG_REFRESH_RETRY_DELAY_MS);
+}
+
+async function refreshSongStateFromServer(options = {}) {
+    const {
+        allowStartupRetry = false,
+        reason = ''
+    } = options;
     try {
         const response = await fetch(`${API_URL}/song`, {
             cache: 'no-store'
@@ -2146,16 +2297,23 @@ async function refreshSongStateFromServer() {
             if (response.status !== 404) {
                 console.warn(`[LYRICS] Failed to refresh song state: HTTP ${response.status}`);
             }
+            if (allowStartupRetry && !state.currentSongData?.videoId) {
+                scheduleStartupSongRefreshRetry(reason || `http-${response.status}`);
+            }
             resolveInitialBootVisibility();
             return;
         }
 
         const data = await response.json();
         if (!data || typeof data !== 'object' || !data.videoId) {
+            if (allowStartupRetry && !state.currentSongData?.videoId) {
+                scheduleStartupSongRefreshRetry(reason || 'empty-song-payload');
+            }
             resolveInitialBootVisibility();
             return;
         }
 
+        clearStartupSongRefreshRetry();
         updateNowPlayingFromData(data, {
             isMainApp: false,
             onLyricsDisplay: displayLyrics,
@@ -2164,6 +2322,9 @@ async function refreshSongStateFromServer() {
         resolveInitialBootVisibility();
     } catch (error) {
         console.warn('[LYRICS] Failed to refresh song state from server:', error);
+        if (allowStartupRetry && !state.currentSongData?.videoId) {
+            scheduleStartupSongRefreshRetry(reason || 'refresh-error');
+        }
         resolveInitialBootVisibility();
     }
 }
@@ -2173,6 +2334,7 @@ function handleWebSocketMessage(message) {
     switch (message.type) {
         case 'song_updated':
             if (message.data) {
+                clearStartupSongRefreshRetry();
                 updateNowPlayingFromData(message.data, {
                     isMainApp: false,
                     onLyricsDisplay: displayLyrics,
@@ -2184,6 +2346,8 @@ function handleWebSocketMessage(message) {
 
         case 'lyrics_updated':
             if (message.data && message.data.videoId === state.currentVideoId) {
+                state.lyricsCandidateOffset = Number(message.data.candidateOffset || 0) || 0;
+                state.lyricsCandidateTotal = Number(message.data.totalCandidates || 0) || 0;
                 console.log(`[LYRICS] Received shared lyrics for: ${message.data.title} by ${message.data.artist}`);
                 displayLyrics(message.data.lyrics, message.data.videoId);
             }
@@ -2191,15 +2355,20 @@ function handleWebSocketMessage(message) {
 
         case 'song_progress':
             if (message.data && message.data.elapsedSeconds !== undefined) {
-                const serverElapsed = message.data.elapsedSeconds;
+                const serverElapsed = Number(message.data.elapsedSeconds) || 0;
                 const serverDuration = message.data.songDuration;
                 const nowMs = Date.now();
+                const sampledAtMs = Number(message.data.sampledAtMs) || nowMs;
+                const wasPaused = !!state.currentSongData?.isPaused;
+                const projectedServerElapsed = Math.max(0, serverElapsed + Math.max(0, (nowMs - sampledAtMs) / 1000));
+                const localElapsed = Number(state.currentSongData?.elapsedSeconds);
+                const safeLocalElapsed = Number.isFinite(localElapsed) ? localElapsed : null;
                 state.lastServerProgressAt = nowMs;
                 state.lastProgressUpdate = serverElapsed;
-                state.serverProgressBaseAt = Number(message.data.sampledAtMs) || nowMs;
-                state.serverProgressBaseElapsed = Number(serverElapsed) || 0;
-                state.playbackAnchorAt = Number(message.data.sampledAtMs) || nowMs;
-                state.playbackAnchorElapsed = Number(serverElapsed) || 0;
+                state.serverProgressBaseAt = sampledAtMs;
+                state.serverProgressBaseElapsed = serverElapsed;
+                state.playbackAnchorAt = sampledAtMs;
+                state.playbackAnchorElapsed = serverElapsed;
 
                 if (message.data.isPaused !== undefined && !window.manuallyPaused) {
                     state.isPaused = message.data.isPaused;
@@ -2211,10 +2380,22 @@ function handleWebSocketMessage(message) {
                 }
                 resolveInitialBootVisibility();
 
-                updateLyricsDisplay(serverElapsed, { trustedTiming: true });
+                const shouldForceLyricUpdate =
+                    !!message.data.isPaused
+                    || wasPaused
+                    || safeLocalElapsed === null
+                    || projectedServerElapsed > (safeLocalElapsed + 0.35);
+
+                if (shouldForceLyricUpdate) {
+                    updateLyricsDisplay(projectedServerElapsed, { trustedTiming: true });
+                }
 
                 if (state.currentSongData) {
-                    state.currentSongData.elapsedSeconds = serverElapsed;
+                    if (safeLocalElapsed === null || shouldForceLyricUpdate) {
+                        state.currentSongData.elapsedSeconds = projectedServerElapsed;
+                    } else {
+                        state.currentSongData.elapsedSeconds = Math.max(safeLocalElapsed, projectedServerElapsed);
+                    }
                     if (serverDuration) {
                         state.currentSongData.songDuration = serverDuration;
                     }
@@ -2227,6 +2408,7 @@ function handleWebSocketMessage(message) {
 
         case 'playback_updated':
             if (message.data) {
+                clearStartupSongRefreshRetry();
                 updateNowPlayingFromData(message.data, {
                     isMainApp: false,
                     onLyricsDisplay: displayLyrics,
@@ -2319,7 +2501,10 @@ async function init() {
     if (typeof WebSocket !== 'undefined' && !state.ws) {
         initWebSocket(handleWebSocketMessage);
     }
-    refreshSongStateFromServer();
+    refreshSongStateFromServer({
+        allowStartupRetry: true,
+        reason: 'initial-load'
+    });
 
     // Apply UI scale
     applyBaseSizing();
@@ -2327,16 +2512,22 @@ async function init() {
 
     const handleVisibilityRestore = () => {
         if (document.hidden) return;
-        refreshSongStateFromServer();
+        refreshSongStateFromServer({
+            allowStartupRetry: !state.currentSongData?.videoId,
+            reason: 'visibility-restore'
+        });
         scheduleViewportSyncAndRecenter();
-        requestAnimationFrame(() => retryRomanizationFetchIfMissing('visibility-restore'));
+        requestAnimationFrame(() => retryLyricAssistFetchIfMissing('visibility-restore'));
     };
     document.addEventListener('visibilitychange', handleVisibilityRestore);
     window.addEventListener('focus', handleVisibilityRestore, { passive: true });
     window.addEventListener('pageshow', handleVisibilityRestore, { passive: true });
     window.addEventListener('lyrics-ws-open', () => {
-        refreshSongStateFromServer();
-        requestAnimationFrame(() => retryRomanizationFetchIfMissing('ws-open'));
+        refreshSongStateFromServer({
+            allowStartupRetry: !state.currentSongData?.videoId,
+            reason: 'ws-open'
+        });
+        requestAnimationFrame(() => retryLyricAssistFetchIfMissing('ws-open'));
     });
 
     
@@ -2389,6 +2580,47 @@ if (document.readyState === 'loading') {
 }
 
 window.addEventListener('resize', handleWindowResize, { passive: true });
+
+async function fetchLyricsCandidateOffset(offset) {
+    const songData = state.currentSongData;
+    const videoId = typeof songData?.videoId === 'string' ? songData.videoId.trim() : '';
+    const artist = typeof songData?.artist === 'string' ? songData.artist.trim() : '';
+    const title = typeof songData?.title === 'string' ? songData.title.trim() : '';
+    if (!videoId || !artist || !title) {
+        console.warn('[LYRICS] No active song available for alternate lyric fetch');
+        return null;
+    }
+
+    const params = new URLSearchParams({
+        videoId,
+        artist,
+        title,
+        album: songData.album || '',
+        duration: String(songData.songDuration || 0),
+        offset: String(Math.max(0, Number(offset) || 0))
+    });
+
+    const response = await fetch(`${API_URL}/lyrics/candidate?${params.toString()}`, {
+        cache: 'no-store'
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result?.success || !result?.data) {
+        throw new Error(result?.error || `HTTP ${response.status}`);
+    }
+
+    state.lyricsCandidateOffset = Number(result.candidateOffset || 0) || 0;
+    state.lyricsCandidateTotal = Number(result.totalCandidates || 0) || 0;
+    displayLyrics(result.data, videoId);
+    console.log(`[LYRICS] Switched to lyric candidate ${state.lyricsCandidateOffset + 1}/${Math.max(1, state.lyricsCandidateTotal)}`);
+    return result;
+}
+
+window.swapLyricsCandidate = async function() {
+    const currentOffset = Number(state.lyricsCandidateOffset || 0) || 0;
+    const total = Number(state.lyricsCandidateTotal || 0) || 0;
+    const nextOffset = total > 0 ? ((currentOffset + 1) % total) : (currentOffset + 1);
+    return fetchLyricsCandidateOffset(nextOffset);
+};
 
 // Toggle function to manually hide/show layout (callable from external app)
 window.togglePause = function() {

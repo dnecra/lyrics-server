@@ -13,7 +13,8 @@ const { spawn } = require('child_process');
 const { logEvent } = require('./lib/logger');
 const {
     loadLyricsCacheFromDisk,
-    fetchLyrics
+    fetchLyrics,
+    fetchLyricsCandidate
 } = require('./lib/lyrics');
 const { fetchImage } = require('./lib/image-proxy');
 
@@ -172,6 +173,36 @@ app.get('/api/v1/lyrics', async (c) => {
         return c.json({ success: false, error: result.error || 'No lyrics found' }, 404);
     } catch (error) {
         console.error('[LYRICS] Error fetching lyrics:', error);
+        return c.json({ error: error.message }, 500);
+    }
+});
+
+app.get('/api/v1/lyrics/candidate', async (c) => {
+    try {
+        const videoId = c.req.query('videoId');
+        const artist = c.req.query('artist');
+        const title = c.req.query('title');
+        const album = c.req.query('album') || '';
+        const duration = parseFloat(c.req.query('duration') || '0');
+        const offset = parseInt(c.req.query('offset') || '0', 10);
+
+        if (!videoId || !artist || !title) {
+            return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
+        }
+
+        const result = await fetchLyricsCandidate(videoId, artist, title, album, duration, offset, broadcast);
+        if (result.success) {
+            return c.json(result);
+        }
+
+        return c.json({
+            success: false,
+            error: result.error || 'No alternate lyrics found',
+            candidateOffset: result.candidateOffset ?? offset,
+            totalCandidates: result.totalCandidates ?? 0
+        }, 404);
+    } catch (error) {
+        console.error('[LYRICS] Error fetching alternate lyrics candidate:', error);
         return c.json({ error: error.message }, 500);
     }
 });

@@ -5,6 +5,9 @@
 :root {
   --lyric-font-size: clamp(16px, 1.146vw, 56px);
   --lyric-line-height: clamp(14px, 1.042vw, 52px);
+  --lyric-line-height-ratio: 0.85;
+  --lyric-line-height-actual: calc(var(--lyric-line-height) * var(--lyric-line-height-ratio));
+  --lyric-wrap-line-height: 0.85;
   --lyric-romanized-size: clamp(1px, 0.5vw, 20px);
 }
 
@@ -41,9 +44,24 @@
   --lyrics-max-width-px: calc(var(--lyrics-available-width) * (var(--lyrics-max-width, 30%) / 100%));
   --hover-color: #000000ab;
   --lyrics-visible-lines: 3;
-  --lyrics-line-outer-gap: clamp(10px, 1vh, 28px);
-  --lyrics-viewport-height: calc((var(--lyric-line-height) + var(--lyrics-line-outer-gap)) * var(--lyrics-visible-lines));
-  --lyrics-edge-fade-size: clamp(12px, calc(var(--lyric-line-height) * 0.9), 160px);
+  --lyrics-line-gap: clamp(10px, 1vh, 28px);
+  --lyrics-line-outer-gap: var(--lyrics-line-gap);
+  --lyrics-viewport-height: calc((var(--lyric-line-height-actual) + var(--lyrics-line-gap, var(--lyrics-line-outer-gap))) * var(--lyrics-visible-lines));
+  --lyrics-edge-fade-size: 128px;
+  --lyrics-edge-fade-size-top: calc(var(--lyrics-edge-fade-size) * 1.5);
+  --lyrics-edge-mask-bottom: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 calc(100% - var(--lyrics-edge-fade-size)),
+    transparent 100%
+  );
+  --lyrics-edge-mask-vertical: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--lyrics-edge-fade-size-top),
+    #000 calc(100% - var(--lyrics-edge-fade-size)),
+    transparent 100%
+  );
   --lyrics-fixed-song-info-gap: 0px;
   --lyrics-song-info-height: 0px;
   --lyrics-mobile-bottom-margin: 0px;
@@ -559,11 +577,13 @@ body.window-resizing #close-window-control {
   transform-origin: 50% 50%;
 }
 
-#layout-container.position-right .lyric-line.romanizable .text-lyrics {
+#layout-container.position-right .lyric-line.romanizable .text-lyrics,
+#layout-container.position-right .lyric-line.translation-assisted .text-lyrics {
   align-items: flex-end;
 }
 
-#layout-container.position-center .lyric-line.romanizable .text-lyrics {
+#layout-container.position-center .lyric-line.romanizable .text-lyrics,
+#layout-container.position-center .lyric-line.translation-assisted .text-lyrics {
   align-items: stretch;
 }
 
@@ -585,7 +605,8 @@ body.window-resizing #close-window-control {
   transform-origin: 0 50%;
 }
 
-#layout-container:not(.position-right):not(.position-center) .lyric-line.romanizable .text-lyrics {
+#layout-container:not(.position-right):not(.position-center) .lyric-line.romanizable .text-lyrics,
+#layout-container:not(.position-right):not(.position-center) .lyric-line.translation-assisted .text-lyrics {
   align-items: flex-start;
 }
 
@@ -689,6 +710,8 @@ body.window-resizing #close-window-control {
   position: relative;
   padding: 0 0.15em;
   border-radius: 0.15em;
+  background: var(--text-bg);
+  border: none;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -712,6 +735,8 @@ body.window-resizing #close-window-control {
   position: relative;
   padding: 0 0.15em;
   border-radius: 0.15em;
+  background: var(--text-bg);
+  border: none;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -739,28 +764,21 @@ body.window-resizing #close-window-control {
   background-color: transparent;
   border: none;
   border-radius: 0;
-  scroll-behavior: smooth;
+  /* scroll-behavior: smooth removed — JS rAF animation handles scrolling;
+     native smooth-scroll and JS animation running together cause jank */
   opacity: 0;
   visibility: hidden;
   transform: translateY(10px);
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
-  overflow: visible;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 var(--lyrics-edge-fade-size),
-    #000 calc(100% - var(--lyrics-edge-fade-size)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 var(--lyrics-edge-fade-size),
-    #000 calc(100% - var(--lyrics-edge-fade-size)),
-    transparent 100%
-  );
+  overflow: hidden; /* default hidden; scroll-line-mode overrides to scroll */
+  -webkit-mask-image: var(--lyrics-edge-mask-bottom);
+  mask-image: var(--lyrics-edge-mask-bottom);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
   -webkit-app-region: no-drag;
   transition: opacity 1.05s ease, transform 1.05s cubic-bezier(0.22, 1, 0.36, 1), visibility 1.05s ease;
   will-change: opacity, transform;
@@ -790,7 +808,7 @@ body.window-resizing #close-window-control {
 }
 
 #lyrics-container.fixed-line-mode {
-  overflow-y: visible;
+  overflow: hidden;
   height: auto;
   min-height: var(--lyrics-viewport-height);
   max-height: none;
@@ -805,40 +823,22 @@ body.window-resizing #close-window-control {
 
 /* Triple mode: feather both top and bottom edges. */
 #lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-3"] {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 var(--lyrics-edge-fade-size),
-    #000 calc(100% - var(--lyrics-edge-fade-size)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    #000 var(--lyrics-edge-fade-size),
-    #000 calc(100% - var(--lyrics-edge-fade-size)),
-    transparent 100%
-  );
+  -webkit-mask-image: var(--lyrics-edge-mask-vertical);
+  mask-image: var(--lyrics-edge-mask-vertical);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 /* Double mode: feather bottom edge only. */
 #lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-2"] {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 calc(100% - var(--lyrics-edge-fade-size)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    #000 0%,
-    #000 calc(100% - var(--lyrics-edge-fade-size)),
-    transparent 100%
-  );
-}
-
-#lyrics-container.fixed-line-mode .lyric-line.fixed-hidden {
-  display: none !important;
+  -webkit-mask-image: var(--lyrics-edge-mask-bottom);
+  mask-image: var(--lyrics-edge-mask-bottom);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 #lyrics-container.fixed-line-mode #synced-lyrics,
@@ -848,8 +848,23 @@ body.window-resizing #close-window-control {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  overflow: visible;
+  overflow: visible !important;
   padding-bottom: 24px;
+  box-sizing: border-box;
+  transition: opacity 220ms ease;
+  transform: none !important;
+}
+
+#lyrics-container.scroll-line-mode #synced-lyrics,
+#lyrics-container.scroll-line-mode #plain-lyrics {
+  height: auto;
+  min-height: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: visible !important;
+  padding-bottom: 0;
   box-sizing: border-box;
   transition: opacity 220ms ease;
   transform: none !important;
@@ -857,8 +872,19 @@ body.window-resizing #close-window-control {
 
 /* Scroll mode needs a real scroll container so JS can keep active line centered. */
 #lyrics-container.scroll-line-mode {
-  overflow-y: auto;
-  overflow-x: visible;
+  display: block;
+  height: var(--lyrics-viewport-height);
+  max-height: var(--lyrics-viewport-height);
+  min-height: var(--lyrics-viewport-height);
+  overflow-y: scroll;
+  overflow-x: hidden;
+  overflow-anchor: none;
+  /* Top/bottom padding = half viewport so first and last lines can be centered.
+     Without this, scrollTop math hits its 0 / maxScroll floor and the active
+     line can never reach the visual centre of the container. */
+  padding-top: calc(var(--lyrics-viewport-height) * 0.38);
+  padding-bottom: 0;
+  box-sizing: border-box;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -869,14 +895,42 @@ body.window-resizing #close-window-control {
 }
 
 #lyrics-container.fixed-line-mode .lyric-line {
-  min-height: var(--lyric-line-height);
+  min-height: var(--lyric-line-height-actual);
   display: flex;
   align-items: flex-end;
   overflow: visible;
+  opacity: 1;
+  visibility: visible;
+  transition: none !important;
 }
 
 #lyrics-container.fixed-line-mode .lyric-line .text-lyrics {
   width: 100%;
+}
+
+#lyrics-container.fixed-line-mode .lyric-line.activating-current {
+  animation: none;
+}
+
+#lyrics-container.fixed-line-mode .lyric-line,
+#lyrics-container.fixed-line-mode .text-lyrics {
+  scale: 1 !important;
+  translate: 0 0 !important;
+}
+
+#lyrics-container.fixed-line-mode .lyric-word,
+#lyrics-container.fixed-line-mode .romanized-word,
+#lyrics-container.fixed-line-mode .translation-word {
+  transition: none !important;
+  transition-delay: 0s !important;
+}
+
+#lyrics-container.fixed-line-mode .lyric-line.fixed-leaving {
+  display: none !important;
+}
+
+#lyrics-container.fixed-line-mode .lyric-line.fixed-hidden {
+  display: none !important;
 }
 
 #lyrics-container.fixed-line-mode #synced-lyrics.revealed,
@@ -886,9 +940,25 @@ body.window-resizing #close-window-control {
   transform: none !important;
 }
 
+#lyrics-container.scroll-line-mode #synced-lyrics.revealed,
+#lyrics-container.scroll-line-mode #plain-lyrics.revealed,
+#lyrics-container.scroll-line-mode #synced-lyrics.song-changing,
+#lyrics-container.scroll-line-mode #plain-lyrics.song-changing {
+  transform: none !important;
+}
+
 /* Parent-level center layout override: allow full song-info overflow. */
 #layout-container.position-center #song-info {
   overflow: visible;
+}
+
+@keyframes fixed-line-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--lyrics-active-opacity);
+  }
 }
 
 
@@ -1064,7 +1134,8 @@ body.window-resizing #close-window-control {
 
 #lyrics-container,
 #lyrics-container * {
-  overflow: visible;
+  /* overflow:visible removed — it prevented the scroll container from
+     actually clipping/scrolling content in scroll-line-mode */
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
@@ -1072,14 +1143,28 @@ body.window-resizing #close-window-control {
   -ms-user-select: none;
 }
 
+/* Children that need visible overflow for glow/transform effects.
+   In fixed-line-mode the container is overflow:hidden to clip the slide animation,
+   so we only restore visible overflow in scroll mode and on sub-word elements. */
+#lyrics-container.scroll-line-mode .lyric-line,
+#lyrics-container .lyric-word,
+#lyrics-container .text-lyrics,
+#lyrics-container .lyric-words,
+#lyrics-container .romanized,
+#lyrics-container .lyric-translation {
+  overflow: visible;
+}
+
 #lyrics-container.scroll-line-mode {
-  overflow-y: auto;
-  overflow-x: visible;
+  overflow-y: scroll;
+  overflow-x: hidden;
 }
 
 #synced-lyrics,
 #plain-lyrics {
   width: 100%;
+  overflow: visible !important;
+  overflow-anchor: none;
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 1.05s ease, transform 1.05s cubic-bezier(0.22, 1, 0.36, 1);
@@ -1101,6 +1186,107 @@ body.window-resizing #close-window-control {
 #layout-container .lyric-line {
   width: 100%;
   box-sizing: border-box;
+  overflow: visible !important;
+}
+
+/* Keep fixed lyric rows fully visible.
+   The line itself can be overflow:visible and still get clipped by the
+   parent viewport's hidden overflow or edge mask in fixed display modes. */
+#lyrics-container.fixed-line-mode,
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-1"],
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-2"],
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-3"] {
+  overflow: hidden !important;
+}
+
+#lyrics-container.fixed-line-mode #synced-lyrics,
+#lyrics-container.fixed-line-mode #plain-lyrics,
+#lyrics-container.fixed-line-mode .lyric-line,
+#lyrics-container.fixed-line-mode .text-lyrics,
+#lyrics-container.fixed-line-mode .lyric-words,
+#lyrics-container.fixed-line-mode .romanized,
+#lyrics-container.fixed-line-mode .lyric-translation {
+  overflow: visible !important;
+}
+
+/* Let lyric content escape the viewport entirely when the text block grows
+   larger than #lyrics-container. This intentionally disables clipping. */
+#lyrics-container,
+#lyrics-container.visible,
+#lyrics-container.has-lyrics,
+#lyrics-container.song-changing {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+#lyrics-container.fixed-line-mode {
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-1"] {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-2"] {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 calc(100% - (var(--lyrics-edge-fade-size) * 2)),
+    transparent 100%
+  ) !important;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0,
+    #000 calc(100% - (var(--lyrics-edge-fade-size) * 2)),
+    transparent 100%
+  ) !important;
+  -webkit-mask-repeat: no-repeat !important;
+  mask-repeat: no-repeat !important;
+  -webkit-mask-size: 100% 100% !important;
+  mask-size: 100% 100% !important;
+}
+
+#lyrics-container.fixed-line-mode[data-lyric-display-mode="fixed-3"] {
+  -webkit-mask-image: var(--lyrics-edge-mask-vertical) !important;
+  mask-image: var(--lyrics-edge-mask-vertical) !important;
+  -webkit-mask-repeat: no-repeat !important;
+  mask-repeat: no-repeat !important;
+  -webkit-mask-size: 100% 100% !important;
+  mask-size: 100% 100% !important;
+}
+
+#synced-lyrics,
+#plain-lyrics,
+#synced-lyrics .lyric-line,
+#plain-lyrics .lyric-line,
+#synced-lyrics .text-lyrics,
+#plain-lyrics .text-lyrics {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Scroll mode should stay a bounded viewport so only the configured number
+   of lines are visible while JS auto-centers the active line. */
+#lyrics-container.scroll-line-mode {
+  height: var(--lyrics-viewport-height) !important;
+  max-height: var(--lyrics-viewport-height) !important;
+  min-height: var(--lyrics-viewport-height) !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  padding-top: calc(var(--lyrics-viewport-height) * 0.5) !important;
+  padding-bottom: 0 !important;
+  -webkit-mask-image: var(--lyrics-edge-mask-vertical) !important;
+  mask-image: var(--lyrics-edge-mask-vertical) !important;
+  -webkit-mask-repeat: no-repeat !important;
+  mask-repeat: no-repeat !important;
+  -webkit-mask-size: 100% 100% !important;
+  mask-size: 100% 100% !important;
 }
 
 /*  #synced-lyrics / #plain-lyrics layout (popout)  */
