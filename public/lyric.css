@@ -288,6 +288,11 @@ html {
   gap: var(--lyrics-subline-gap);
 }
 
+.lyric-line.translation-assisted:not(.romanizable) .text-lyrics > .lyric-words {
+  display: block;
+  order: 0;
+}
+
 /* The romanized text row itself (Latin translation) - uses separate sizing */
 .lyric-line .romanized {
   display: block;
@@ -310,6 +315,7 @@ html {
   line-height: 1.2;
   font-weight: var(--lyrics-translation-font-weight) !important;
   font-variation-settings: "wght" var(--lyrics-translation-font-weight);
+  font-style: italic;
   letter-spacing: 0.01em;
   opacity: calc(var(--lyrics-active-opacity) * 0.78);
   color: color-mix(in srgb, currentColor 88%, white 12%);

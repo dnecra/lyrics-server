@@ -22,10 +22,12 @@ let latchedBlankCutoffIndex = -1;
 let pendingBlankCutoffAnimationFrame = 0;
 let pendingLeavingCurrentAnimationFrame = 0;
 const LYRIC_DISPLAY_MODES = new Set(['scroll', 'fixed-3', 'fixed-2', 'fixed-1']);
+const LYRICS_CONTAINER_EXIT_DURATION_MS = 1000;
 let currentLyricDisplayMode = 'scroll';
 let lastRenderedLyricDisplayMode = 'scroll';
 let compactNoLyricsLeavingTimer = null;
 let compactNoLyricsEnteringTimer = null;
+let lyricsContainerHideTimer = null;
 const activeScrollAnimations = new WeakMap();
 
 function applyLyricsTimingOffset(currentTimeSeconds) {
@@ -33,6 +35,13 @@ function applyLyricsTimingOffset(currentTimeSeconds) {
     if (!Number.isFinite(numericTime)) return 0;
     // Negative offset means show lyrics earlier than playback.
     return Math.max(0, numericTime - LYRICS_OFFSET_SECONDS);
+}
+
+function clearPendingLyricsContainerHide() {
+    if (lyricsContainerHideTimer) {
+        clearTimeout(lyricsContainerHideTimer);
+        lyricsContainerHideTimer = null;
+    }
 }
 
 function setCompactNoLyricsState(enabled) {
@@ -1190,6 +1199,7 @@ export function displayLyricsUI(data, {
     const plainLyricsContainer = document.getElementById('plain-lyrics');
     const lyricsLoadingEl = document.getElementById('lyrics-loading');
     const rightNowPlaying = document.getElementById('song-info');
+    clearPendingLyricsContainerHide();
 
     const revealLyricsBlock = (activeContainer, inactiveContainer) => {
         if (inactiveContainer) {
@@ -1241,7 +1251,7 @@ export function displayLyricsUI(data, {
             // Wait for animation to complete
             setTimeout(() => {
                 resolve();
-            }, 300);
+            }, LYRICS_CONTAINER_EXIT_DURATION_MS);
         });
     };
 
@@ -1491,37 +1501,63 @@ export function hideLyricsUI({
     const syncedLyricsContainer = document.getElementById('synced-lyrics');
     const plainLyricsContainer = document.getElementById('plain-lyrics');
     const lyricsLoadingEl = document.getElementById('lyrics-loading');
+    const hadVisibleLyrics =
+        !!lyricsContainer?.classList.contains('visible')
+        || !!lyricsContainer?.classList.contains('has-lyrics')
+        || !!syncedLyricsContainer?.children.length
+        || !!plainLyricsContainer?.children.length;
 
-    if (syncedLyricsContainer) syncedLyricsContainer.innerHTML = '';
-    clearLyricLineElementsCache();
-    if (plainLyricsContainer) {
-        plainLyricsContainer.innerHTML = '';
-        plainLyricsContainer.style.display = 'none';
-        plainLyricsContainer.classList.remove('revealed');
-        plainLyricsContainer.classList.remove('active');
-    }
+    clearPendingLyricsContainerHide();
 
-    if (syncedLyricsContainer) {
-        syncedLyricsContainer.classList.remove('revealed');
-        syncedLyricsContainer.classList.add('transitioning');
-    }
-    if (lyricsContainer) {
-        lyricsContainer.classList.add('no-lyrics');
-        lyricsContainer.classList.remove('visible');
-        lyricsContainer.classList.remove('has-lyrics');
-        lyricsContainer.classList.remove('loading-lyrics');
-    }
-    if (lyricsLoadingEl) {
-        lyricsLoadingEl.classList.remove('active');
-        lyricsLoadingEl.style.display = '';
-    }
-    if (lyricsContainer && !state.lyricsManuallyCollapsed && !lyricsContainer.classList.contains('collapsed')) {
-        toggleLyricsCollapse({ auto: true, force: 'collapse' });
+    if (hadVisibleLyrics) {
+        if (lyricsContainer) lyricsContainer.classList.add('song-changing');
+        if (syncedLyricsContainer) syncedLyricsContainer.classList.add('song-changing');
+        if (plainLyricsContainer) plainLyricsContainer.classList.add('song-changing');
+        const allLines = document.querySelectorAll('#synced-lyrics .lyric-line, #plain-lyrics .lyric-line');
+        allLines.forEach((line) => line.classList.add('transitioning-out'));
     }
 
-    const songInfo = document.getElementById('song-info');
-    if (songInfo) songInfo.classList.add('no-lyrics');
-    setCompactNoLyricsState(true);
+    const finalizeHide = () => {
+        if (syncedLyricsContainer) syncedLyricsContainer.innerHTML = '';
+        clearLyricLineElementsCache();
+        if (plainLyricsContainer) {
+            plainLyricsContainer.innerHTML = '';
+            plainLyricsContainer.style.display = 'none';
+            plainLyricsContainer.classList.remove('revealed');
+            plainLyricsContainer.classList.remove('active', 'song-changing');
+        }
+
+        if (syncedLyricsContainer) {
+            syncedLyricsContainer.classList.remove('revealed');
+            syncedLyricsContainer.classList.remove('song-changing');
+            syncedLyricsContainer.classList.add('transitioning');
+        }
+        if (lyricsContainer) {
+            lyricsContainer.classList.add('no-lyrics');
+            lyricsContainer.classList.remove('visible');
+            lyricsContainer.classList.remove('has-lyrics');
+            lyricsContainer.classList.remove('loading-lyrics');
+            lyricsContainer.classList.remove('song-changing');
+        }
+        if (lyricsLoadingEl) {
+            lyricsLoadingEl.classList.remove('active');
+            lyricsLoadingEl.style.display = '';
+        }
+        if (lyricsContainer && !state.lyricsManuallyCollapsed && !lyricsContainer.classList.contains('collapsed')) {
+            toggleLyricsCollapse({ auto: true, force: 'collapse' });
+        }
+
+        const songInfo = document.getElementById('song-info');
+        if (songInfo) songInfo.classList.add('no-lyrics');
+        setCompactNoLyricsState(true);
+        lyricsContainerHideTimer = null;
+    };
+
+    if (hadVisibleLyrics) {
+        lyricsContainerHideTimer = setTimeout(finalizeHide, LYRICS_CONTAINER_EXIT_DURATION_MS);
+    } else {
+        finalizeHide();
+    }
 
     console.log(`[${logTag}] Lyrics hidden`);
 }
