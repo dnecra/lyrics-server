@@ -389,21 +389,22 @@ export async function updateNowPlayingFromData(data, handlers = {}) {
     const hasElapsed = Number.isFinite(Number(data.elapsedSeconds));
     const incomingElapsed = hasElapsed ? Number(data.elapsedSeconds) : null;
 
+    const previousSongData = songChanged ? null : state.currentSongData;
     const displayData = {
-        ...state.currentSongData,
+        ...(previousSongData || {}),
         ...data,
         title: Object.prototype.hasOwnProperty.call(data, 'title')
-            ? (normalizeSongText(data.title) || ((!songChanged ? state.currentSongData?.title : '') || ''))
-            : (state.currentSongData?.title || ''),
+            ? (normalizeSongText(data.title) || (previousSongData?.title || ''))
+            : (previousSongData?.title || ''),
         artist: Object.prototype.hasOwnProperty.call(data, 'artist')
-            ? (normalizeSongText(data.artist) || ((!songChanged ? state.currentSongData?.artist : '') || ''))
-            : (state.currentSongData?.artist || ''),
+            ? (normalizeSongText(data.artist) || (previousSongData?.artist || ''))
+            : (previousSongData?.artist || ''),
         imageSrc: Object.prototype.hasOwnProperty.call(data, 'imageSrc')
             ? (data.imageSrc || '')
-            : ((!songChanged ? state.currentSongData?.imageSrc : '') || ''),
+            : (previousSongData?.imageSrc || ''),
         album: Object.prototype.hasOwnProperty.call(data, 'album')
             ? (data.album || '')
-            : (state.currentSongData?.album || '')
+            : (previousSongData?.album || '')
     };
 
     if (songChanged) {

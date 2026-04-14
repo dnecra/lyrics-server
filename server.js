@@ -423,6 +423,10 @@ wss.on('connection', (ws, req) => {
 let lastSongSnapshot = null;
 let lastProgressSecond = null;
 let lastPlaybackPaused = null;
+let pendingSongTimingGuardVideoId = null;
+let pendingSongTimingGuardStartedAt = 0;
+const NEW_SONG_TIMING_GUARD_MS = 1500;
+const NEW_SONG_TIMING_GUARD_MAX_INITIAL_ELAPSED_SECONDS = 1.0;
 
 function normalizeSongData(input) {
     if (!input || typeof input !== 'object') return null;
@@ -445,41 +449,77 @@ function normalizeSongData(input) {
 }
 
 function maybeBroadcastSongUpdate(songData) {
-    latestSongData = songData;
+    const previousVideoId = String(latestSongData?.videoId || '').trim();
+    const nextVideoId = String(songData?.videoId || '').trim();
+    const nowMs = Date.now();
+    const songChanged = !!nextVideoId && nextVideoId !== previousVideoId;
+
+    if (songChanged) {
+        pendingSongTimingGuardVideoId = nextVideoId;
+        pendingSongTimingGuardStartedAt = nowMs;
+    }
+
+    const guardedSongData = (() => {
+        const isGuardedVideo = pendingSongTimingGuardVideoId
+            && nextVideoId
+            && pendingSongTimingGuardVideoId === nextVideoId;
+        if (!isGuardedVideo) return songData;
+
+        const guardAgeMs = Math.max(0, nowMs - pendingSongTimingGuardStartedAt);
+        const elapsedSeconds = Number(songData.elapsedSeconds);
+        const shouldHoldAtStart = !songData.isPaused
+            && Number.isFinite(elapsedSeconds)
+            && elapsedSeconds > NEW_SONG_TIMING_GUARD_MAX_INITIAL_ELAPSED_SECONDS
+            && guardAgeMs <= NEW_SONG_TIMING_GUARD_MS;
+
+        if (shouldHoldAtStart) {
+            return {
+                ...songData,
+                elapsedSeconds: 0,
+                sampledAtMs: nowMs
+            };
+        }
+
+        pendingSongTimingGuardVideoId = null;
+        pendingSongTimingGuardStartedAt = 0;
+        return songData;
+    })();
+
+    latestSongData = guardedSongData;
     const comparable = {
-        videoId: songData.videoId,
-        title: songData.title || '',
-        artist: songData.artist || '',
-        album: songData.album || '',
-        imageSrc: songData.imageSrc || '',
-        isPaused: !!songData.isPaused
+        videoId: guardedSongData.videoId,
+        title: guardedSongData.title || '',
+        artist: guardedSongData.artist || '',
+        album: guardedSongData.album || '',
+        imageSrc: guardedSongData.imageSrc || '',
+        isPaused: !!guardedSongData.isPaused
     };
 
     const snapshotChanged = JSON.stringify(comparable) !== JSON.stringify(lastSongSnapshot);
     if (snapshotChanged) {
         lastSongSnapshot = comparable;
-        broadcast({ type: 'song_updated', data: songData });
+        broadcast({ type: 'song_updated', data: guardedSongData });
     }
 
-    const progressSecond = Math.floor(Number(songData.elapsedSeconds || 0));
+    const progressSecond = Math.floor(Number(guardedSongData.elapsedSeconds || 0));
     if (Number.isFinite(progressSecond) && progressSecond !== lastProgressSecond) {
         lastProgressSecond = progressSecond;
         broadcast({
             type: 'song_progress',
             data: {
-                elapsedSeconds: songData.elapsedSeconds,
-                songDuration: songData.songDuration,
-                videoId: songData.videoId,
-                isPaused: !!songData.isPaused,
-                sampledAtMs: songData.sampledAtMs
+                elapsedSeconds: guardedSongData.elapsedSeconds,
+                songDuration: guardedSongData.songDuration,
+                videoId: guardedSongData.videoId,
+                isPaused: !!guardedSongData.isPaused,
+                sampledAtMs: guardedSongData.sampledAtMs
             }
         });
     }
 
-    const paused = !!songData.isPaused;
+    const paused = !!guardedSongData.isPaused;
     if (paused !== lastPlaybackPaused) {
         lastPlaybackPaused = paused;
-        broadcast({ type: 'playback_updated', data: songData });
+        broadcast({ type: 'playback_updated', data: guardedSongData });
     }
 }
 

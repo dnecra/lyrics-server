@@ -6,7 +6,6 @@ const MUSIC_NOTE_SYMBOL = '\u266A';
 const GAP_FILL_BASE_THRESHOLD_SECONDS = 20;
 const FINAL_BLANK_TARGET_GAP_SECONDS = 5;
 const LYRICS_OFFSET_SECONDS = 0;
-const SYNCED_LYRIC_PARSE_OFFSET_SECONDS = 1.0;
 const LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS = 2.0;
 const LYRIC_INDEX_HYSTERESIS_SECONDS = 0;
 const AUTO_CENTER_TOLERANCE_PX = 6;
@@ -690,6 +689,18 @@ export function addRomanizedText(lineElement, romanizedText) {
 }
 
 export function addLyricTranslation(lineElement, translationText) {
+    const isBlankLine = lineElement?.classList?.contains('music-note-line')
+        || lineElement?.dataset?.isBlankLine === 'true'
+        || !lineElement?.querySelector('.lyric-words');
+    if (isBlankLine) {
+        const existingBlankTranslation = lineElement?.querySelector('.lyric-translation');
+        if (existingBlankTranslation) {
+            existingBlankTranslation.remove();
+        }
+        lineElement?.classList?.remove('translation-assisted');
+        return;
+    }
+
     const existing = lineElement.querySelector('.lyric-translation');
     if (existing) {
         existing.remove();
@@ -1104,6 +1115,7 @@ function buildWordAnimatedLine(text, {
     div.className = 'lyric-line synced-line';
     div.dataset.index = index;
     div.dataset.original = (text || '').toString();
+    div.dataset.isBlankLine = isMusicNote ? 'true' : 'false';
 
     if (needsRomanization) div.classList.add('romanizable');
     if (isMusicNote) div.classList.add('music-note-line');
@@ -1151,7 +1163,9 @@ function buildWordAnimatedLine(text, {
     }
 
     if (
-        prefetchedTranslation
+        !isMusicNote
+        && div.dataset.isBlankLine !== 'true'
+        && prefetchedTranslation
         && prefetchedTranslation.trim()
         && prefetchedTranslation.trim() !== (text || '').toString().trim()
     ) {
@@ -1285,7 +1299,10 @@ function parseSyncedLyrics(syncedSource) {
                 const text = (match[4] || '').toString();
                 const rawTime = (min * 60) + sec + (ms / divisor);
                 return createLyricLine({
-                    time: rawTime - SYNCED_LYRIC_PARSE_OFFSET_SECONDS,
+                    // Keep provider timestamps intact. Subtracting a fixed parse-time
+                    // offset makes some sources, including YouTube Music-backed flows,
+                    // advance to the next lyric line too early for the entire song.
+                    time: rawTime,
                     rawTime,
                     text,
                     sourceIndex
@@ -1547,7 +1564,23 @@ animateOutLyrics().then(() => {
                         localCurrentTime
                     );
                     if (!isFetchStillValid() || !isRenderStillCurrent()) return;
-                    const currentTime = Math.max(localCurrentTime, fetchedCurrentTime);
+                    const currentTime = (() => {
+                        const localTime = Number(localCurrentTime);
+                        const fetchedTime = Number(fetchedCurrentTime);
+                        const safeLocalTime = Number.isFinite(localTime) ? Math.max(0, localTime) : 0;
+                        const safeFetchedTime = Number.isFinite(fetchedTime) ? Math.max(0, fetchedTime) : safeLocalTime;
+
+                        // On song changes, the local client state can briefly keep a
+                        // stale advanced elapsed value while /song has already been
+                        // corrected by newer server data. Preserve the "use the more
+                        // advanced local time" behavior only for small tick-sized
+                        // differences; otherwise prefer the fresher server value.
+                        if (safeLocalTime > (safeFetchedTime + 2)) {
+                            return safeFetchedTime;
+                        }
+
+                        return Math.max(safeLocalTime, safeFetchedTime);
+                    })();
 
                     if (isFetchStillValid() && isRenderStillCurrent()) {
                         if (lyricsLoadingEl) lyricsLoadingEl.classList.remove('active');
