@@ -356,32 +356,51 @@ function getLyricTranslationExcludedLanguages() {
     return [...currentLyricTranslationExcludedLanguages];
 }
 
-function isTranslationLanguageExcluded(languageCode) {
-    const normalized = String(languageCode || '').trim().toLowerCase();
-    return !!normalized && currentLyricTranslationExcludedLanguages.includes(normalized);
-}
+function applyLyricTranslationExcludedLanguages(languages, { persist = true, refresh = true, forceRefresh = false, reason = 'translation-exclusion-update' } = {}) {
+    const nextLanguages = normalizeTranslationExcludedLanguages(languages);
+    const previousLanguages = getLyricTranslationExcludedLanguages();
+    const changed = previousLanguages.length !== nextLanguages.length
+        || previousLanguages.some((language, index) => language !== nextLanguages[index]);
 
-function sanitizeLyricsTranslationPayload(data) {
-    if (!data || typeof data !== 'object') return data;
-    const translationLanguage = data.translationLanguage && typeof data.translationLanguage === 'object'
-        ? data.translationLanguage
-        : null;
-    const detectedLanguage = String(translationLanguage?.detectedLanguage || '').trim().toLowerCase();
-    const forceTranslate = translationLanguage?.forceTranslate === true;
-    if (!detectedLanguage || forceTranslate || !isTranslationLanguageExcluded(detectedLanguage)) {
-        return data;
+    currentLyricTranslationExcludedLanguages = nextLanguages;
+    window.__lyricTranslationExcludedLanguages = getLyricTranslationExcludedLanguages();
+
+    if (persist) saveSettings();
+    if (refresh && (changed || forceRefresh)) {
+        Promise.resolve(refreshCurrentLyricsTranslationPreference(reason)).catch((error) => {
+            console.warn(`[LYRICS] Failed to refresh lyrics after ${reason}:`, error);
+        });
     }
 
-    const sanitized = { ...data };
-    delete sanitized.translatedSyncedLyrics;
-    delete sanitized.englishSyncedLyrics;
-    sanitized.translationState = 'excluded';
-    sanitized.translationLanguage = {
-        ...translationLanguage,
-        isExcluded: true,
-        excludedLanguages: getLyricTranslationExcludedLanguages()
-    };
-    return sanitized;
+    console.log('[LYRICS] Translation exclusions:', currentLyricTranslationExcludedLanguages);
+    return getLyricTranslationExcludedLanguages();
+}
+
+async function fetchSharedLyricTranslationExcludedLanguages() {
+    const response = await fetch(`${API_URL}/preferences/translation-exclusions`, {
+        cache: 'no-store'
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return normalizeTranslationExcludedLanguages(payload?.languages);
+}
+
+async function pushLyricTranslationExcludedLanguagesToServer(languages) {
+    const normalized = normalizeTranslationExcludedLanguages(languages);
+    const response = await fetch(`${API_URL}/preferences/translation-exclusions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ languages: normalized })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.success === false) {
+        throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    return normalizeTranslationExcludedLanguages(payload?.languages);
 }
 let isWidthShortcutHeld = false;
 let isWidthControlHovered = false;
@@ -2210,10 +2229,9 @@ function initializeLyricsWidthHandle() {
 function displayLyrics(data, fetchVideoId) {
     const normalizeVideoId = (value) => (value === undefined || value === null) ? '' : String(value).trim();
     const targetVideoId = normalizeVideoId(fetchVideoId);
-    const safeData = sanitizeLyricsTranslationPayload(data);
-    const translationState = String(safeData?.translationState || '').trim().toLowerCase();
-    const translationLanguage = safeData?.translationLanguage && typeof safeData.translationLanguage === 'object'
-        ? safeData.translationLanguage
+    const translationState = String(data?.translationState || '').trim().toLowerCase();
+    const translationLanguage = data?.translationLanguage && typeof data.translationLanguage === 'object'
+        ? data.translationLanguage
         : null;
     if (state.currentSongData && normalizeVideoId(state.currentVideoId) === targetVideoId) {
         state.currentSongData = {
@@ -2225,7 +2243,7 @@ function displayLyrics(data, fetchVideoId) {
     if (translationLanguage?.detectedLanguage) {
         console.log(`[LYRICS] Translation language detected: ${translationLanguage.detectedLanguage}${translationLanguage.isExcluded ? ' (excluded)' : ''}`);
     }
-    const result = displayLyricsUI(safeData, {
+    const result = displayLyricsUI(data, {
         fetchVideoId,
         validateFetch: () => {
             const currentVideoId = normalizeVideoId(state.currentVideoId);
@@ -2281,16 +2299,30 @@ function refreshCurrentLyricsTranslationPreference(reason = 'translation-prefere
 }
 
 function setLyricTranslationExcludedLanguages(languages, { persist = true, refresh = true } = {}) {
-    currentLyricTranslationExcludedLanguages = normalizeTranslationExcludedLanguages(languages);
-    window.__lyricTranslationExcludedLanguages = getLyricTranslationExcludedLanguages();
-    if (persist) saveSettings();
-    if (refresh) {
-        Promise.resolve(refreshCurrentLyricsTranslationPreference('translation-exclusion-update')).catch((error) => {
-            console.warn('[LYRICS] Failed to refresh lyrics after translation exclusion update:', error);
+    const normalized = normalizeTranslationExcludedLanguages(languages);
+    const localResult = applyLyricTranslationExcludedLanguages(normalized, {
+        persist,
+        refresh,
+        forceRefresh: refresh,
+        reason: 'translation-exclusion-update-local'
+    });
+
+    Promise.resolve(pushLyricTranslationExcludedLanguagesToServer(normalized))
+        .then((serverLanguages) => applyLyricTranslationExcludedLanguages(serverLanguages, {
+            persist,
+            refresh: false,
+            reason: 'translation-exclusion-update'
+        }))
+        .catch((error) => {
+            console.warn('[LYRICS] Failed to sync translation exclusions to server:', error);
+            applyLyricTranslationExcludedLanguages(normalized, {
+                persist,
+                refresh,
+                reason: 'translation-exclusion-update-fallback'
+            });
         });
-    }
-    console.log('[LYRICS] Translation exclusions:', currentLyricTranslationExcludedLanguages);
-    return getLyricTranslationExcludedLanguages();
+
+    return localResult;
 }
 
 function toggleLyricTranslationExcludedLanguage(languageCode, options = {}) {
@@ -2413,6 +2445,14 @@ function handleWebSocketMessage(message) {
                 console.log(`[LYRICS] Received shared lyrics for: ${message.data.title} by ${message.data.artist}`);
                 displayLyrics(message.data.lyrics, message.data.videoId);
             }
+            break;
+
+        case 'translation_exclusions_updated':
+            applyLyricTranslationExcludedLanguages(message.data?.languages || [], {
+                persist: true,
+                refresh: true,
+                reason: 'shared-translation-exclusion-update'
+            });
             break;
 
         case 'song_progress':
@@ -2550,6 +2590,15 @@ async function init() {
     if (typeof WebSocket !== 'undefined' && !state.ws) {
         initWebSocket(handleWebSocketMessage);
     }
+    Promise.resolve(fetchSharedLyricTranslationExcludedLanguages())
+        .then((languages) => applyLyricTranslationExcludedLanguages(languages, {
+            persist: true,
+            refresh: true,
+            reason: 'server-translation-exclusion-sync'
+        }))
+        .catch((error) => {
+            console.warn('[LYRICS] Failed to load shared translation exclusions from server:', error);
+        });
     refreshSongStateFromServer();
 
     // Apply UI scale

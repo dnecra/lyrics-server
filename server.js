@@ -45,6 +45,19 @@ app.use('*', cors());
 
 const clients = new Set();
 let latestSongData = null;
+let sharedTranslationExcludedLanguages = [];
+
+function normalizeExcludedLanguageCodes(value) {
+    const values = Array.isArray(value)
+        ? value
+        : String(value || '')
+            .split(/[,\s]+/g)
+            .filter(Boolean);
+
+    return Array.from(new Set(values
+        .map((entry) => String(entry || '').trim().toLowerCase())
+        .filter(Boolean)));
+}
 
 async function readJsonFileSafe(filePath) {
     try {
@@ -160,10 +173,10 @@ app.get('/api/v1/lyrics', async (c) => {
         const title = c.req.query('title');
         const album = c.req.query('album') || '';
         const duration = parseFloat(c.req.query('duration') || '0');
-        const translationExcludedLanguages = String(c.req.query('translationExclude') || '')
-            .split(/[,\s]+/g)
-            .map((value) => value.trim().toLowerCase())
-            .filter(Boolean);
+        const requestedTranslationExcludedLanguages = normalizeExcludedLanguageCodes(c.req.query('translationExclude'));
+        const translationExcludedLanguages = requestedTranslationExcludedLanguages.length > 0
+            ? requestedTranslationExcludedLanguages
+            : sharedTranslationExcludedLanguages;
 
         if (!videoId || !artist || !title) {
             return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
@@ -191,10 +204,10 @@ app.get('/api/v1/lyrics/candidate', async (c) => {
         const album = c.req.query('album') || '';
         const duration = parseFloat(c.req.query('duration') || '0');
         const offset = parseInt(c.req.query('offset') || '0', 10);
-        const translationExcludedLanguages = String(c.req.query('translationExclude') || '')
-            .split(/[,\s]+/g)
-            .map((value) => value.trim().toLowerCase())
-            .filter(Boolean);
+        const requestedTranslationExcludedLanguages = normalizeExcludedLanguageCodes(c.req.query('translationExclude'));
+        const translationExcludedLanguages = requestedTranslationExcludedLanguages.length > 0
+            ? requestedTranslationExcludedLanguages
+            : sharedTranslationExcludedLanguages;
 
         if (!videoId || !artist || !title) {
             return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
@@ -215,6 +228,36 @@ app.get('/api/v1/lyrics/candidate', async (c) => {
         }, 404);
     } catch (error) {
         console.error('[LYRICS] Error fetching alternate lyrics candidate:', error);
+        return c.json({ error: error.message }, 500);
+    }
+});
+
+app.get('/api/v1/preferences/translation-exclusions', (c) => {
+    return c.json({
+        success: true,
+        languages: sharedTranslationExcludedLanguages
+    });
+});
+
+app.post('/api/v1/preferences/translation-exclusions', async (c) => {
+    try {
+        const payload = await c.req.json().catch(() => ({}));
+        sharedTranslationExcludedLanguages = normalizeExcludedLanguageCodes(
+            payload?.languages ?? payload?.translationExclude ?? []
+        );
+
+        broadcast({
+            type: 'translation_exclusions_updated',
+            data: {
+                languages: sharedTranslationExcludedLanguages
+            }
+        });
+
+        return c.json({
+            success: true,
+            languages: sharedTranslationExcludedLanguages
+        });
+    } catch (error) {
         return c.json({ error: error.message }, 500);
     }
 });
@@ -396,6 +439,17 @@ function sendLatestStateToClient(client) {
     }));
 }
 
+function sendTranslationExclusionsToClient(client) {
+    if (!client || client.readyState !== WebSocket.OPEN) return;
+
+    client.send(JSON.stringify({
+        type: 'translation_exclusions_updated',
+        data: {
+            languages: sharedTranslationExcludedLanguages
+        }
+    }));
+}
+
 wss.on('connection', (ws, req) => {
     if (req.url && !req.url.startsWith('/ws')) {
         ws.close(1008, 'Unsupported websocket endpoint');
@@ -405,6 +459,7 @@ wss.on('connection', (ws, req) => {
     clients.add(ws);
     logEvent('info', 'WS', `Client connected (${clients.size} total)`);
     sendLatestStateToClient(ws);
+    sendTranslationExclusionsToClient(ws);
 
     ws.on('message', () => {
         // Lyrics page does not send control commands.
