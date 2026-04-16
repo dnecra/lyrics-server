@@ -108,6 +108,10 @@ function requestLyricsIfReady(songData, onLyricsDisplay, onLyricsHide) {
     const artist = normalizeSongText(songData?.artist);
     const title = normalizeSongText(songData?.title);
     if (!videoId || !artist || !title) return false;
+    if (songData?.isMusicEligible === false) {
+        if (typeof onLyricsHide === 'function') onLyricsHide();
+        return false;
+    }
 
     const requestKey = buildLyricsRequestKey(songData);
     const hasLyricsForCurrentSong =

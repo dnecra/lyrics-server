@@ -35,7 +35,6 @@ import { canonicalizeText, escapeHtml, escapeHtmlAttribute } from './modules/uti
 let lyricsContainerClickable = false;
 const SETTINGS_KEY = 'lyricsSettings';
 const DEFAULT_LYRICS_PAGE_WIDTH_PERCENT = 15;
-const DEFAULT_LYRICS_PAGE_DISPLAY_MODE = 'fixed-2';
 const DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET = 'bold';
 
 function isDownloadPreviewPage() {
@@ -336,7 +335,7 @@ let lyricsWidthBoundsResizeRaf = null;
 let recenterAfterResizeRaf = null;
 let viewportSyncTimeout = null;
 let currentLyricsMaxWidthVw = DEFAULT_LYRICS_PAGE_WIDTH_PERCENT;
-let currentLyricsDisplayMode = DEFAULT_LYRICS_PAGE_DISPLAY_MODE;
+let currentLyricsDisplayMode = DEFAULT_LYRIC_DISPLAY_MODE;
 let lyricsWidthDragActive = false;
 let lyricsWidthDragHandleSide = null;
 
@@ -1913,7 +1912,7 @@ function initializeLyricsThemeColorCycle() {
 function applySavedSettings() {
     const isPhoneLayout = isPhoneLayoutEnvironment();
     const defaultLayoutPosition = isPhoneLayout ? 'center' : 'left';
-    const defaultDisplayMode = isPhoneLayout ? 'scroll' : DEFAULT_LYRICS_PAGE_DISPLAY_MODE;
+    const defaultDisplayMode = DEFAULT_LYRIC_DISPLAY_MODE;
     const defaultLyricsWidthPercent = DEFAULT_LYRICS_PAGE_WIDTH_PERCENT;
     const settings = loadSettings();
     if (settings) {

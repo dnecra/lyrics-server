@@ -155,6 +155,15 @@ function materializeSongDataForDispatch(songData, nowMs = Date.now()) {
     };
 }
 
+function getEffectiveMusicEligibilityForVideoId(videoId) {
+    const normalizedVideoId = String(videoId || '').trim();
+    if (!normalizedVideoId) return null;
+    const currentVideoId = String(latestSongData?.videoId || '').trim();
+    if (!currentVideoId || currentVideoId !== normalizedVideoId) return null;
+    if (typeof latestSongData?.isMusicEligible !== 'boolean') return null;
+    return latestSongData.isMusicEligible;
+}
+
 app.get('/api/v1/song', async (c) => {
     try {
         if (latestSongData) {
@@ -180,6 +189,9 @@ app.get('/api/v1/lyrics', async (c) => {
 
         if (!videoId || !artist || !title) {
             return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
+        }
+        if (getEffectiveMusicEligibilityForVideoId(videoId) === false) {
+            return c.json({ success: false, error: 'Lyrics disabled for non-music session' }, 404);
         }
 
         const result = await fetchLyrics(videoId, artist, title, album, duration, broadcast, {
@@ -211,6 +223,14 @@ app.get('/api/v1/lyrics/candidate', async (c) => {
 
         if (!videoId || !artist || !title) {
             return c.json({ error: 'Missing required parameters: videoId, artist, title' }, 400);
+        }
+        if (getEffectiveMusicEligibilityForVideoId(videoId) === false) {
+            return c.json({
+                success: false,
+                error: 'Lyrics disabled for non-music session',
+                candidateOffset: offset,
+                totalCandidates: 0
+            }, 404);
         }
 
         const result = await fetchLyricsCandidate(videoId, artist, title, album, duration, offset, broadcast, {
@@ -493,6 +513,7 @@ function normalizeSongData(input) {
         elapsedSeconds: Number(input.elapsedSeconds ?? input.progress ?? 0) || 0,
         songDuration: Number(input.songDuration ?? input.duration ?? 0) || 0,
         isPaused: input.isPaused ?? false,
+        isMusicEligible: typeof input.isMusicEligible === 'boolean' ? input.isMusicEligible : null,
         imageSrc: input.imageSrc || '',
         albumArtist: input.albumArtist || '',
         trackNumber: Number(input.trackNumber ?? 0) || 0,

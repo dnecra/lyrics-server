@@ -10,6 +10,7 @@ internal sealed class SmtcPayload
 {
     public bool HasSession { get; set; }
     public string? NoSessionReason { get; set; }
+    public bool IsMusicEligible { get; set; }
     public string? VideoId { get; set; }
     public string? Title { get; set; }
     public string? Artist { get; set; }
@@ -154,6 +155,7 @@ internal static class Program
                     var info = snapshot.MediaProperties;
                     var timeline = snapshot.Timeline;
                     var playback = snapshot.PlaybackInfo;
+                    var isMusicEligible = IsMusicEligibleSession(snapshot);
 
                     var title = (info?.Title ?? string.Empty).Trim();
                     var artist = (info?.Artist ?? string.Empty).Trim();
@@ -189,6 +191,7 @@ internal static class Program
                     WritePayload(new SmtcPayload
                     {
                         HasSession = true,
+                        IsMusicEligible = isMusicEligible,
                         VideoId = videoId,
                         Title = title,
                         Artist = artist,
