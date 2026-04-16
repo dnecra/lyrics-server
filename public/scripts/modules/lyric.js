@@ -5,9 +5,7 @@ let lastRenderedLyricsExpanded = null;
 const MUSIC_NOTE_SYMBOL = '\u266A';
 const GAP_FILL_BASE_THRESHOLD_SECONDS = 20;
 const FINAL_BLANK_TARGET_GAP_SECONDS = 5;
-const LYRICS_OFFSET_SECONDS = 0;
-const LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS = 2.0;
-const LYRIC_INDEX_HYSTERESIS_SECONDS = 0;
+const LYRICS_OFFSET_SECONDS = 1;
 const AUTO_CENTER_TOLERANCE_PX = 6;
 const AUTO_CENTER_RETARGET_DEADZONE_PX = 8;
 let lyricLineElements = [];
@@ -36,13 +34,6 @@ function isBlankCutoffEnabledForCurrentPage() {
     }
     // Default to enabled unless the page explicitly disables it.
     return window.__lyricsBlankCutoffEnabled !== false;
-}
-
-function applyLyricsTimingOffset(currentTimeSeconds) {
-    const numericTime = Number(currentTimeSeconds);
-    if (!Number.isFinite(numericTime)) return 0;
-    // Negative offset means show lyrics earlier than playback.
-    return Math.max(0, numericTime - LYRICS_OFFSET_SECONDS);
 }
 
 function clearPendingLyricsContainerHide() {
@@ -559,7 +550,7 @@ function getLyricLineTime(lines, index) {
     return Number.isFinite(time) ? time : null;
 }
 
-function stabilizeCurrentLyricIndex(lines, candidateIndex, effectiveTime, previousIndex, { didBackwardSeek = false } = {}) {
+function stabilizeCurrentLyricIndex(lines, candidateIndex, effectiveTime, previousIndex) {
     if (!Array.isArray(lines) || lines.length === 0) return candidateIndex;
     if (!Number.isFinite(candidateIndex) || candidateIndex < 0) return candidateIndex;
     if (!Number.isFinite(previousIndex) || previousIndex < 0) return candidateIndex;
@@ -567,24 +558,17 @@ function stabilizeCurrentLyricIndex(lines, candidateIndex, effectiveTime, previo
 
     const jumpDistance = Math.abs(candidateIndex - previousIndex);
     if (jumpDistance > 1) return candidateIndex;
-
-    const hysteresis = LYRIC_INDEX_HYSTERESIS_SECONDS;
     const previousLineTime = getLyricLineTime(lines, previousIndex);
     const candidateLineTime = getLyricLineTime(lines, candidateIndex);
 
     if (candidateIndex === previousIndex + 1) {
         if (!Number.isFinite(candidateLineTime)) return candidateIndex;
-        return effectiveTime >= (candidateLineTime + hysteresis)
-            ? candidateIndex
-            : previousIndex;
+        return effectiveTime >= candidateLineTime ? candidateIndex : previousIndex;
     }
 
     if (candidateIndex === previousIndex - 1) {
-        if (didBackwardSeek) return candidateIndex;
         if (!Number.isFinite(previousLineTime)) return candidateIndex;
-        return effectiveTime < (previousLineTime - hysteresis)
-            ? candidateIndex
-            : previousIndex;
+        return effectiveTime < previousLineTime ? candidateIndex : previousIndex;
     }
 
     return candidateIndex;
@@ -872,30 +856,17 @@ export async function fetchLyrics(artist, title, album = '', duration = 0, onSuc
 
 // Lyrics display update
 export function updateLyricsDisplay(currentTime, options = {}) {
-    const { trustedTiming = false } = options;
     const numericTime = Number(currentTime);
     if (!Number.isFinite(numericTime)) return;
-    currentTime = Math.max(0, numericTime);
-
-    const rawEffectiveTime = applyLyricsTimingOffset(currentTime);
-    let didBackwardSeek = false;
+    // Shift only the active-line selection window. Playback timing, provider
+    // timestamps, and animation durations still use the original source data.
+    const rawEffectiveTime = Math.max(0, numericTime - LYRICS_OFFSET_SECONDS);
     const effectiveTime = (() => {
         const prev = Number(lastStableLyricEffectiveTime);
         if (!Number.isFinite(prev)) {
             lastStableLyricEffectiveTime = rawEffectiveTime;
             return rawEffectiveTime;
         }
-        if (rawEffectiveTime >= prev) {
-            lastStableLyricEffectiveTime = rawEffectiveTime;
-            return rawEffectiveTime;
-        }
-
-        const backwardDelta = prev - rawEffectiveTime;
-        if (!trustedTiming && backwardDelta <= LYRIC_BACKWARD_SEEK_THRESHOLD_SECONDS) {
-            return prev;
-        }
-
-        didBackwardSeek = true;
         lastStableLyricEffectiveTime = rawEffectiveTime;
         return rawEffectiveTime;
     })();
@@ -908,8 +879,7 @@ export function updateLyricsDisplay(currentTime, options = {}) {
         state.currentLyrics,
         currentIndex,
         effectiveTime,
-        lastRenderedLyricIndex,
-        { didBackwardSeek }
+        lastRenderedLyricIndex
     );
 
     const lyricsContainer = document.getElementById('lyrics-container');
@@ -962,9 +932,7 @@ export function updateLyricsDisplay(currentTime, options = {}) {
         return idx;
     })();
     if (isBlankCutoffEnabledForCurrentPage()) {
-        if (didBackwardSeek) {
-            latchedBlankCutoffIndex = latestBlankCutoffIndex;
-        } else if (latestBlankCutoffIndex > latchedBlankCutoffIndex) {
+        if (latestBlankCutoffIndex > latchedBlankCutoffIndex) {
             latchedBlankCutoffIndex = latestBlankCutoffIndex;
         }
     } else {
