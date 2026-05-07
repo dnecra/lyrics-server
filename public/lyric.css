@@ -306,7 +306,7 @@ html {
 
 .lyric-line .lyric-translation {
   display: block;
-  order: 1;
+  order: 3;
   font-family: inherit;
   font-size: calc(var(--lyric-font-size, 27px) * 0.4);
   line-height: 1.2;
@@ -322,7 +322,7 @@ html {
 
 .lyric-line.translation-assisted .text-lyrics > .lyric-words {
   display: block;
-  order: 2;
+  order: 1;
 }
 
 :root.lyrics-translation-hidden .lyric-line .lyric-translation {
