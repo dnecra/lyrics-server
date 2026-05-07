@@ -1242,12 +1242,14 @@ function parseSyncedLyrics(syncedSource) {
                 const time = Number.isFinite(numericTime) ? numericTime : 0;
                 const text = (item?.text || '').toString();
                 const isIncomingBlank = !!item?.isEmpty || !!item?.isSourceBlank || text.trim() === '';
+                const rawSourceIndex = Number(item?.sourceIndex);
+                const rawParsedIndex = Number(item?.parsedIndex);
                 return createLyricLine({
                     time,
                     rawTime: time,
                     text: isIncomingBlank ? '' : text,
-                    sourceIndex,
-                    parsedIndex: sourceIndex
+                    sourceIndex: Number.isFinite(rawSourceIndex) && rawSourceIndex >= 0 ? rawSourceIndex : sourceIndex,
+                    parsedIndex: Number.isFinite(rawParsedIndex) && rawParsedIndex >= 0 ? rawParsedIndex : sourceIndex
                 });
             })
             .filter(Boolean)));
@@ -1344,7 +1346,7 @@ export function displayLyricsUI(data, {
     const rightNowPlaying = document.getElementById('song-info');
     clearPendingLyricsContainerHide();
 
-    const revealLyricsBlock = (activeContainer, inactiveContainer) => {
+    const revealLyricsBlock = (activeContainer, inactiveContainer, beforeReveal = null) => {
         if (inactiveContainer) {
             inactiveContainer.classList.remove('revealed');
             inactiveContainer.style.display = 'none';
@@ -1353,6 +1355,9 @@ export function displayLyricsUI(data, {
 
         activeContainer.classList.remove('revealed');
         activeContainer.style.display = 'flex';
+        if (typeof beforeReveal === 'function') {
+            beforeReveal();
+        }
         // Replay content reveal even if the same container was already visible.
         void activeContainer.offsetHeight;
         requestAnimationFrame(() => {
@@ -1366,6 +1371,7 @@ export function displayLyricsUI(data, {
         lyricsContainer.classList.add('no-lyrics');
         lyricsContainer.classList.add('loading-lyrics');
         lyricsContainer.classList.remove('has-lyrics');
+        updateLyricDisplayModeDomState(normalizeLyricDisplayMode(currentLyricDisplayMode));
     }
 
     // Check if there are existing lyrics to animate out
@@ -1472,19 +1478,21 @@ animateOutLyrics().then(() => {
                     if (!Array.isArray(sourceItems)) return null;
                     const bySourceIndex = new Map();
                     const byParsedIndex = new Map();
+                    let hasSourceIndexes = false;
                     sourceItems.forEach((item, idx) => {
                         const text = (item?.text || '').toString();
                         const rawSourceIndex = Number(item?.sourceIndex);
                         const rawParsedIndex = Number(item?.parsedIndex);
                         if (Number.isFinite(rawSourceIndex) && rawSourceIndex >= 0 && !bySourceIndex.has(rawSourceIndex)) {
                             bySourceIndex.set(rawSourceIndex, text);
+                            hasSourceIndexes = true;
                         }
                         const parsedKey = Number.isFinite(rawParsedIndex) && rawParsedIndex >= 0 ? rawParsedIndex : idx;
                         if (!byParsedIndex.has(parsedKey)) {
                             byParsedIndex.set(parsedKey, text);
                         }
                     });
-                    return { bySourceIndex, byParsedIndex };
+                    return { bySourceIndex, byParsedIndex, hasSourceIndexes };
                 };
                 const romanizedAssistMaps = buildAssistIndexMaps(romanizedSyncedSource);
                 const translatedAssistMaps = buildAssistIndexMaps(translatedSyncedSource);
@@ -1493,6 +1501,9 @@ animateOutLyrics().then(() => {
                     const sourceIndex = Number(line?.sourceIndex);
                     if (Number.isFinite(sourceIndex) && sourceIndex >= 0 && maps.bySourceIndex.has(sourceIndex)) {
                         return (maps.bySourceIndex.get(sourceIndex) || '').toString();
+                    }
+                    if (maps.hasSourceIndexes && Number.isFinite(sourceIndex) && sourceIndex >= 0) {
+                        return '';
                     }
                     const parsedIndex = Number(line?.parsedIndex);
                     if (Number.isFinite(parsedIndex) && parsedIndex >= 0) {
@@ -1559,7 +1570,9 @@ animateOutLyrics().then(() => {
                     }
 
                     if (isFetchStillValid() && isRenderStillCurrent()) {
-                        revealLyricsBlock(syncedLyricsContainer, plainLyricsContainer);
+                        revealLyricsBlock(syncedLyricsContainer, plainLyricsContainer, () => {
+                            updateLyricsDisplay(currentTime, { initialReveal: true });
+                        });
                         if (lyricsContainer) {
                             lyricsContainer.classList.remove('no-lyrics');
                             lyricsContainer.classList.add('visible');
@@ -1576,7 +1589,7 @@ animateOutLyrics().then(() => {
                     // can legitimately lag behind the websocket/local progress path
                     // by a tick, and forcing that older value on first paint is what
                     // makes the initial line appear late until the next playback event.
-                    updateLyricsDisplay(currentTime);
+                    centerActiveLyricLineStrict(lastRenderedLyricIndex, lyricsContainer, { behavior: 'instant' });
 
                     if (setLastFetched) {
                         state.lastFetchedVideoId = state.currentVideoId;
