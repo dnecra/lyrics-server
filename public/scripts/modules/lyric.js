@@ -861,9 +861,11 @@ export function updateLyricsDisplay(currentTime, options = {}) {
     // Shift only the active-line selection window. Playback timing, provider
     // timestamps, and animation durations still use the original source data.
     const rawEffectiveTime = Math.max(0, numericTime - LYRICS_OFFSET_SECONDS);
+    const previousEffectiveTime = Number(lastStableLyricEffectiveTime);
+    const didSeekBackward = Number.isFinite(previousEffectiveTime)
+        && rawEffectiveTime < (previousEffectiveTime - 0.75);
     const effectiveTime = (() => {
-        const prev = Number(lastStableLyricEffectiveTime);
-        if (!Number.isFinite(prev)) {
+        if (!Number.isFinite(previousEffectiveTime)) {
             lastStableLyricEffectiveTime = rawEffectiveTime;
             return rawEffectiveTime;
         }
@@ -932,7 +934,9 @@ export function updateLyricsDisplay(currentTime, options = {}) {
         return idx;
     })();
     if (isBlankCutoffEnabledForCurrentPage()) {
-        if (latestBlankCutoffIndex > latchedBlankCutoffIndex) {
+        if (didSeekBackward && latestBlankCutoffIndex < latchedBlankCutoffIndex) {
+            latchedBlankCutoffIndex = latestBlankCutoffIndex;
+        } else if (latestBlankCutoffIndex > latchedBlankCutoffIndex) {
             latchedBlankCutoffIndex = latestBlankCutoffIndex;
         }
     } else {
