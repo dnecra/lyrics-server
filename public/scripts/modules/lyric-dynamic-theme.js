@@ -88,6 +88,8 @@ export function initLyricDynamicTheme() {
     let lastImageSrc = null;
     let lastPalette = null;
     let pendingUpdate = null;
+    let activeRequestId = 0;
+    let activeImageSrc = '';
 
     function rgbToHex(r, g, b) {
         return '#' + [r, g, b].map((x) => {
@@ -432,16 +434,25 @@ export function initLyricDynamicTheme() {
         }
     }
 
+    function isCurrentThemeRequest(requestId, currentSrc) {
+        return requestId === activeRequestId && currentSrc === activeImageSrc;
+    }
+
     function applyPaletteFromImage(img, currentSrc, options = {}) {
         if (!img) return;
+        const requestId = Number(options?.requestId) || activeRequestId;
 
         const process = () => {
+            if (!isCurrentThemeRequest(requestId, currentSrc)) return;
+
             const raw = extractBlendedColor(img);
             if (!raw) return;
+            if (!isCurrentThemeRequest(requestId, currentSrc)) return;
 
             const palette = buildPalette(raw.r, raw.g, raw.b);
             const key = JSON.stringify(palette);
             if (key === lastPalette) return;
+            if (!isCurrentThemeRequest(requestId, currentSrc)) return;
 
             lastPalette = key;
             lastImageSrc = currentSrc;
@@ -454,6 +465,11 @@ export function initLyricDynamicTheme() {
 
         if (!img.complete) {
             img.addEventListener('load', process, { once: true });
+            img.addEventListener('error', () => {
+                if (isCurrentThemeRequest(requestId, currentSrc)) {
+                    lastImageSrc = null;
+                }
+            }, { once: true });
         } else {
             process();
         }
@@ -478,7 +494,13 @@ export function initLyricDynamicTheme() {
 
         if (!currentSrc) return;
         if (currentSrc === lastImageSrc && lastPalette) return;
-        applyPaletteFromImage(img, currentSrc, options);
+
+        activeRequestId += 1;
+        activeImageSrc = currentSrc;
+        applyPaletteFromImage(img, currentSrc, {
+            ...options,
+            requestId: activeRequestId
+        });
     }
 
     function scheduleUpdate(delay = 120, options = {}) {
@@ -534,7 +556,6 @@ export function initLyricDynamicTheme() {
             }
             document.getElementById('__dt_vars')?.remove();
             const root = document.documentElement;
-            root.classList.remove(INSTANT_THEME_APPLY_CLASS);
             [
                 '--text-primary', '--text-secondary',
                 '--text-secondary-var1', '--text-secondary-var2',
@@ -547,6 +568,8 @@ export function initLyricDynamicTheme() {
         }
         lastImageSrc = null;
         lastPalette = null;
+        activeRequestId += 1;
+        activeImageSrc = '';
         dynamicThemeState = null;
         window.__dynamicThemeRefresh = null;
         window.__dynamicThemeScheduleRefresh = null;

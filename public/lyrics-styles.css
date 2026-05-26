@@ -719,7 +719,6 @@ body.window-resizing #close-window-control {
 #song-info.lyrics-loading-active #song-info-title,
 #song-info.lyrics-loading-active #song-info-artist {
   opacity: 0;
-  transform: translateY(-6px);
 }
 
 @keyframes song-info-loader-spin {
@@ -802,7 +801,6 @@ body.window-resizing #close-window-control {
 
 #song-info.lyrics-loading-active #song-info-content {
   opacity: 0;
-  transform: translateY(-6px);
 }
 
 #song-info.lyrics-loading-active #song-info-loading-overlay {

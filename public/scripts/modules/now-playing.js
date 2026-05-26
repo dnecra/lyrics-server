@@ -84,11 +84,13 @@ function applyCoverImage(cover, imageSrc) {
             cover.onerror = null;
             cover.src = FALLBACK_ALBUM_COVER_SRC;
             cover.dataset.appliedImageSrc = FALLBACK_ALBUM_COVER_SRC;
+            refreshLyricDynamicTheme({ imageSrc: FALLBACK_ALBUM_COVER_SRC });
         };
         cover.src = nextSrc;
         cover.dataset.appliedImageSrc = nextSrc;
         delete cover.dataset.pendingImageSrc;
         delete cover.dataset.pendingImageToken;
+        refreshLyricDynamicTheme({ imageSrc: nextSrc });
         if (shouldRevealActualCover && nextSrc !== FALLBACK_ALBUM_COVER_SRC && typeof cover.animate === 'function') {
             if (typeof cover.getAnimations === 'function') {
                 cover.getAnimations().forEach((animation) => animation.cancel());
@@ -112,6 +114,7 @@ function applyCoverImage(cover, imageSrc) {
     }
 
     const preloader = new Image();
+    preloader.crossOrigin = 'anonymous';
     preloader.onload = () => commitImage(resolvedSrc);
     preloader.onerror = () => commitImage(FALLBACK_ALBUM_COVER_SRC);
     preloader.src = resolvedSrc;
