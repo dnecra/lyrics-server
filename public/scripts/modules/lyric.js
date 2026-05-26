@@ -26,6 +26,10 @@ const fixedLineHideTimers = new WeakMap();
 const scrollBlankFadeFrames = new WeakMap();
 const BLANK_CUTOFF_HIDE_DELAY_MS = 2000;
 
+function signalLyricsSongInfoLoadingDone() {
+    document.dispatchEvent(new CustomEvent('lyrics-song-info-loading-end'));
+}
+
 function isBlankCutoffEnabledForCurrentPage() {
     const viewportWidth = Math.max(1, window.innerWidth || document.documentElement.clientWidth || 1);
     const isPhoneLayout = !!document.documentElement?.classList?.contains('is-phone-layout');
@@ -1346,7 +1350,6 @@ export function displayLyricsUI(data, {
     const lyricsContainer = document.getElementById('lyrics-container');
     const syncedLyricsContainer = document.getElementById('synced-lyrics');
     const plainLyricsContainer = document.getElementById('plain-lyrics');
-    const lyricsLoadingEl = document.getElementById('lyrics-loading');
     const rightNowPlaying = document.getElementById('song-info');
     clearPendingLyricsContainerHide();
 
@@ -1566,7 +1569,7 @@ animateOutLyrics().then(() => {
                     })();
 
                     if (isFetchStillValid() && isRenderStillCurrent()) {
-                        if (lyricsLoadingEl) lyricsLoadingEl.classList.remove('active');
+                        signalLyricsSongInfoLoadingDone();
                         if (lyricsContainer) {
                             lyricsContainer.classList.remove('loading-lyrics');
                             lyricsContainer.classList.add('has-lyrics');
@@ -1627,7 +1630,7 @@ animateOutLyrics().then(() => {
             }
             if (rightNowPlaying) rightNowPlaying.classList.add('no-lyrics');
             setCompactNoLyricsState(true);
-            if (lyricsLoadingEl) lyricsLoadingEl.classList.remove('active');
+            signalLyricsSongInfoLoadingDone();
 
             if (setLastFetched) {
                 state.lastFetchedVideoId = state.currentVideoId;
@@ -1646,7 +1649,7 @@ animateOutLyrics().then(() => {
         }
         if (rightNowPlaying) rightNowPlaying.classList.add('no-lyrics');
         setCompactNoLyricsState(true);
-        if (lyricsLoadingEl) lyricsLoadingEl.classList.remove('active');
+        signalLyricsSongInfoLoadingDone();
         console.log(`[${logTag}] No lyrics available to display`);
     });
 });
@@ -1676,7 +1679,6 @@ export function hideLyricsUI({
     const lyricsContainer = document.getElementById('lyrics-container');
     const syncedLyricsContainer = document.getElementById('synced-lyrics');
     const plainLyricsContainer = document.getElementById('plain-lyrics');
-    const lyricsLoadingEl = document.getElementById('lyrics-loading');
     const hadVisibleLyrics =
         !!lyricsContainer?.classList.contains('visible')
         || !!lyricsContainer?.classList.contains('has-lyrics')
@@ -1715,10 +1717,7 @@ export function hideLyricsUI({
             lyricsContainer.classList.remove('loading-lyrics');
             lyricsContainer.classList.remove('song-changing');
         }
-        if (lyricsLoadingEl) {
-            lyricsLoadingEl.classList.remove('active');
-            lyricsLoadingEl.style.display = '';
-        }
+        signalLyricsSongInfoLoadingDone();
         if (lyricsContainer && !state.lyricsManuallyCollapsed && !lyricsContainer.classList.contains('collapsed')) {
             toggleLyricsCollapse({ auto: true, force: 'collapse' });
         }

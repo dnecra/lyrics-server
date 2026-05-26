@@ -6,6 +6,46 @@ import { refreshLyricDynamicTheme } from './lyric-dynamic-theme.js';
 const FALLBACK_ALBUM_COVER_SRC = '/icons/album-cover-placeholder.png';
 const LOCAL_PROGRESS_INTERVAL_MS = 250;
 
+function getLyricsSongInfoElements() {
+    return {
+        songInfo: document.getElementById('song-info'),
+        songInfoContent: document.getElementById('song-info-content')
+    };
+}
+
+function setLyricsSongInfoLoadingActive(active) {
+    const { songInfo, songInfoContent } = getLyricsSongInfoElements();
+    if (!songInfo) return;
+
+    songInfo.classList.toggle('lyrics-loading-active', !!active);
+    if (songInfoContent) {
+        songInfoContent.classList.toggle('lyrics-loading-active', !!active);
+    }
+    songInfo.classList.add('loaded');
+}
+
+function clearLyricsSongInfoLoadingTimer() {
+    if (state.lyricsLoadingDismissTimer) {
+        clearTimeout(state.lyricsLoadingDismissTimer);
+        state.lyricsLoadingDismissTimer = null;
+    }
+}
+
+function beginLyricsSongInfoLoading() {
+    clearLyricsSongInfoLoadingTimer();
+    state.lyricsLoadingStartedAt = Date.now();
+    setLyricsSongInfoLoadingActive(true);
+}
+
+function endLyricsSongInfoLoading() {
+    clearLyricsSongInfoLoadingTimer();
+    state.lyricsLoadingStartedAt = 0;
+    setLyricsSongInfoLoadingActive(false);
+}
+
+document.addEventListener('lyrics-song-info-loading-start', beginLyricsSongInfoLoading);
+document.addEventListener('lyrics-song-info-loading-end', endLyricsSongInfoLoading);
+
 
 // ---------------------------------------------------------------------------
 // Image helpers
@@ -258,6 +298,11 @@ export function updateNowPlayingUI(data, options = {}) {
             } else {
                 delete songInfo.dataset.contentKey;
                 songInfo.classList.remove('loaded');
+                songInfo.classList.remove('lyrics-loading-active');
+                const songInfoContent = document.getElementById('song-info-content');
+                if (songInfoContent) songInfoContent.classList.remove('lyrics-loading-active');
+                clearLyricsSongInfoLoadingTimer();
+                state.lyricsLoadingStartedAt = 0;
             }
         }
         return;
@@ -425,17 +470,17 @@ export async function updateNowPlayingFromData(data, handlers = {}) {
         // Clear lyrics containers
         const syncedEl = document.getElementById('synced-lyrics');
         const plainEl = document.getElementById('plain-lyrics');
-        const loadingEl = document.getElementById('lyrics-loading');
         if (syncedEl) { syncedEl.innerHTML = ''; syncedEl.style.display = 'none'; }
         if (plainEl) { plainEl.innerHTML = ''; plainEl.style.display = 'none'; }
-        if (loadingEl) { loadingEl.style.display = ''; loadingEl.classList.add('active'); }
+        beginLyricsSongInfoLoading();
 
-        if (!requestLyricsIfReady(displayData, onLyricsDisplay, onLyricsHide) && loadingEl) {
-            loadingEl.classList.remove('active');
+        if (!requestLyricsIfReady(displayData, onLyricsDisplay, onLyricsHide)) {
+            endLyricsSongInfoLoading();
         }
     } else if (
         requestLyricsIfReady(displayData, onLyricsDisplay, onLyricsHide)
     ) {
+        beginLyricsSongInfoLoading();
         console.log('[LYRICS] Fetching lyrics for current song (mid-song load)');
     } else if (incomingElapsed !== null) {
         syncPlaybackAnchor(data, nowMs);

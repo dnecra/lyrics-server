@@ -31,11 +31,16 @@
       </div>
       <div id="song-info">
         <div id="song-info-content">
-          <img id="song-info-cover" class="cover" src="" alt="Album Cover">
+          <div id="song-info-cover-slot">
+            <img id="song-info-cover" class="cover" src="" alt="Album Cover">
+          </div>
           <div class="info">
             <div id="song-info-title" class="title"></div>
             <div id="song-info-artist" class="artist"></div>
           </div>
+        </div>
+        <div id="song-info-loading-overlay" aria-live="polite" aria-atomic="true">
+          <span class="song-info-loading-text">Press <kbd>Alt</kbd><span class="song-info-hotkey-plus">+</span><kbd>Shift</kbd><span class="song-info-hotkey-plus">+</span><kbd>F</kbd> to toggle lyric control</span>
         </div>
       </div>
     </div>

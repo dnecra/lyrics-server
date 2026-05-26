@@ -47,6 +47,8 @@ export const state = {
     serverProgressBaseElapsed: 0,
     playbackAnchorAt: 0,
     playbackAnchorElapsed: 0,
+    lyricsLoadingStartedAt: 0,
+    lyricsLoadingDismissTimer: null,
     
     // Volume
     isUserAdjustingVolume: false,
@@ -75,4 +77,9 @@ export function resetSongState() {
     state.serverProgressBaseElapsed = 0;
     state.playbackAnchorAt = 0;
     state.playbackAnchorElapsed = 0;
+    state.lyricsLoadingStartedAt = 0;
+    if (state.lyricsLoadingDismissTimer) {
+        clearTimeout(state.lyricsLoadingDismissTimer);
+        state.lyricsLoadingDismissTimer = null;
+    }
 }
