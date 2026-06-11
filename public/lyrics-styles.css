@@ -1243,7 +1243,7 @@ body.window-resizing #close-window-control {
   transform: translateY(0) scale(0.96);
 }
 
-/* Match /welcome close control style for lyrics page (legacy close-window-control path). */
+/* Legacy close-window-control path. */
 #close-window-control {
   top: 64px;
   left: 50%;

@@ -1,5 +1,5 @@
 // Configuration and shared state
-export const API_URL = '/api/v1';
+export const API_URL = '/api';
 export const MAX_RECONNECT_ATTEMPTS = 10;
 
 // Shared state

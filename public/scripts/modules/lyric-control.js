@@ -1,5 +1,5 @@
 // Centralized UI wiring for the lyrics control panel.
-// Keeps welcome-song.js and scripts/lyrics.js from duplicating slider/shortcut wiring.
+// Keeps lyric pages from duplicating slider/shortcut wiring.
 
 /**
  * Injects the full #lyrics-width-control markup.
@@ -764,7 +764,7 @@ export function initLyricControlPanel(deps = {}) {
     window._lyricControlPanelInitialized = true;
 }
 
-// Shared responsive heuristic so welcome and lyrics pages behave consistently.
+// Shared responsive heuristic for lyric pages.
 export function isPhoneLayoutEnvironment() {
     const ua = navigator.userAgent || '';
     const isPhoneUa = /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile/i.test(ua);
@@ -779,7 +779,7 @@ export function isPhoneLayoutEnvironment() {
     return isPhoneUa && coarsePointer && noHover && phoneViewport;
 }
 
-// Default lyric-control state values (shared by /lyrics and /welcome).
+// Default lyric-control state values.
 export const DEFAULT_FONT_SIZE = 32;
 export const MIN_FONT_SIZE = 16;
 export const MAX_FONT_SIZE = 128;
