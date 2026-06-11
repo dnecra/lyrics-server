@@ -70,7 +70,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: 24.13.0
-        cache: npm
+        cache: pnpm
 
     - name: Setup .NET 10 SDK
       uses: actions/setup-dotnet@v4
