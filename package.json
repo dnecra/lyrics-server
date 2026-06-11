@@ -29,5 +29,8 @@
       "public/**/*",
       "node_modules/kuromoji/dict/**/*"
     ]
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
   }
 }
