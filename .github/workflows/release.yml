@@ -66,11 +66,16 @@ jobs:
         git tag $tag
         git push origin $tag
 
-    - name: Use Node.js 24
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9
+
+    - name: Use Node.js 24 & Setup Cache
       uses: actions/setup-node@v4
       with:
         node-version: 24.13.0
-        cache: pnpm
+        cache: 'pnpm'
 
     - name: Setup .NET 10 SDK
       uses: actions/setup-dotnet@v4
@@ -88,10 +93,10 @@ jobs:
         7z
 
     - name: Install dependencies
-      run: npm ci
+      run: pnpm install --frozen-lockfile
 
     - name: Build
-      run: npm run build
+      run: pnpm run build
 
     - name: Show build sizes
       shell: powershell
