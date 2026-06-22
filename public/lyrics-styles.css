@@ -40,7 +40,7 @@
   --lyrics-corner-left: var(--lyrics-corner-inset);
   --lyrics-corner-right: var(--lyrics-corner-inset);
   --lyrics-corner-bottom: var(--lyrics-corner-inset);
-  --lyrics-window-controls-safe-top: 128px;
+  --lyrics-window-controls-safe-top: 72px;
   --lyrics-available-width: calc(100% - var(--lyrics-corner-left) - var(--lyrics-corner-right));
   --lyrics-max-width-px: calc(var(--lyrics-available-width) * (var(--lyrics-max-width, 30%) / 100%));
   --hover-color: #000000ab;
@@ -498,6 +498,11 @@ body.window-resizing #close-window-control {
 
 #layout-container.corner-top:not(.position-center) #lyrics-container {
   order: 1;
+}
+
+#layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode {
+  margin-top: 24px;
+  margin-bottom: 0;
 }
 
 #layout-container.position-center {
