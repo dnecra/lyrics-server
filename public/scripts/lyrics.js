@@ -323,6 +323,7 @@ const lyricControlLabelTouched = {
     mode: false,
     font: false,
     background: false,
+    corner: false,
     translation: false,
     position: false,
     dynamic: false,
@@ -1032,6 +1033,7 @@ function syncWidthControlButtonMetrics() {
     const modeButton = document.getElementById('lyrics-display-mode-toggle');
     const weightButton = document.getElementById('lyrics-font-weight-toggle');
     const backgroundButton = document.getElementById('lyrics-background-toggle');
+    const cornerButton = document.getElementById('lyrics-corner-toggle');
     const translationButton = document.getElementById('lyrics-translation-toggle');
     const dynamicThemeToggleButton = document.getElementById('lyrics-dynamic-theme-toggle');
     const themeColorCycleButton = document.getElementById('lyrics-theme-color-cycle');
@@ -1041,6 +1043,7 @@ function syncWidthControlButtonMetrics() {
         || !modeButton
         || !weightButton
         || !backgroundButton
+        || !cornerButton
         || !translationButton
         || !dynamicThemeToggleButton
         || !themeColorCycleButton
@@ -1050,26 +1053,29 @@ function syncWidthControlButtonMetrics() {
     const modeWidth = Math.ceil(modeButton.offsetWidth);
     const weightWidth = Math.ceil(weightButton.offsetWidth);
     const backgroundWidth = Math.ceil(backgroundButton.offsetWidth);
+    const cornerWidth = Math.ceil(cornerButton.offsetWidth);
     const translationVisible = !!(translationButton.offsetParent && !translationButton.hidden);
     const translationWidth = translationVisible ? Math.ceil(translationButton.offsetWidth) : 0;
     const dynamicThemeToggleVisible = !!(dynamicThemeToggleButton.offsetParent && !dynamicThemeToggleButton.hidden);
     const dynamicThemeToggleWidth = dynamicThemeToggleVisible ? Math.ceil(dynamicThemeToggleButton.offsetWidth) : 0;
     const themeColorCycleWidth = Math.ceil(themeColorCycleButton.offsetWidth);
     const gap = 8;
-    const modeOffset = positionWidth + gap;
-    const weightOffset = positionWidth + modeWidth + (gap * 2);
+    const cornerOffset = positionWidth + gap;
+    const modeOffset = cornerOffset + cornerWidth + gap;
+    const weightOffset = modeOffset + modeWidth + gap;
     const backgroundOffset = weightOffset + weightWidth + gap;
     const translationOffset = backgroundOffset + backgroundWidth + gap;
     const dynamicThemeToggleOffset = translationVisible
         ? translationOffset + translationWidth + gap
-        : backgroundOffset + backgroundWidth + gap;
+        : translationOffset;
     const themeColorCycleOffset = dynamicThemeToggleVisible
         ? dynamicThemeToggleOffset + dynamicThemeToggleWidth + gap
         : dynamicThemeToggleOffset;
     const totalWidth = dynamicThemeToggleVisible
-        ? positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + dynamicThemeToggleWidth + themeColorCycleWidth + (gap * (translationVisible ? 6 : 5))
-        : positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + themeColorCycleWidth + (gap * (translationVisible ? 5 : 4));
+        ? positionWidth + modeWidth + weightWidth + backgroundWidth + cornerWidth + translationWidth + dynamicThemeToggleWidth + themeColorCycleWidth + (gap * (translationVisible ? 7 : 6))
+        : positionWidth + modeWidth + weightWidth + backgroundWidth + cornerWidth + translationWidth + themeColorCycleWidth + (gap * (translationVisible ? 6 : 5));
     widthControl.style.setProperty('--lyrics-control-buttons-width', `${totalWidth}px`);
+    widthControl.style.setProperty('--lyrics-corner-toggle-left', `${cornerOffset}px`);
     widthControl.style.setProperty('--lyrics-mode-toggle-left', `${modeOffset}px`);
     widthControl.style.setProperty('--lyrics-font-weight-toggle-left', `${weightOffset}px`);
     widthControl.style.setProperty('--lyrics-background-toggle-left', `${backgroundOffset}px`);
@@ -1077,16 +1083,17 @@ function syncWidthControlButtonMetrics() {
     widthControl.style.setProperty('--lyrics-dynamic-theme-toggle-left', `${dynamicThemeToggleOffset}px`);
     widthControl.style.setProperty('--lyrics-theme-color-cycle-left', `${themeColorCycleOffset}px`);
     widthControl.style.setProperty('--lyrics-position-toggle-right', `0px`);
-    widthControl.style.setProperty('--lyrics-mode-toggle-right', `${positionWidth + gap}px`);
-    widthControl.style.setProperty('--lyrics-font-weight-toggle-right', `${positionWidth + modeWidth + (gap * 2)}px`);
-    widthControl.style.setProperty('--lyrics-background-toggle-right', `${positionWidth + modeWidth + weightWidth + (gap * 3)}px`);
-    widthControl.style.setProperty('--lyrics-translation-toggle-right', `${positionWidth + modeWidth + weightWidth + backgroundWidth + (gap * 4)}px`);
+    widthControl.style.setProperty('--lyrics-corner-toggle-right', `${positionWidth + gap}px`);
+    widthControl.style.setProperty('--lyrics-mode-toggle-right', `${positionWidth + cornerWidth + (gap * 2)}px`);
+    widthControl.style.setProperty('--lyrics-font-weight-toggle-right', `${positionWidth + cornerWidth + modeWidth + (gap * 3)}px`);
+    widthControl.style.setProperty('--lyrics-background-toggle-right', `${positionWidth + cornerWidth + modeWidth + weightWidth + (gap * 4)}px`);
+    widthControl.style.setProperty('--lyrics-translation-toggle-right', `${positionWidth + cornerWidth + modeWidth + weightWidth + backgroundWidth + (gap * 5)}px`);
     widthControl.style.setProperty('--lyrics-dynamic-theme-toggle-right', translationVisible
-        ? `${positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + (gap * 5)}px`
-        : `${positionWidth + modeWidth + weightWidth + backgroundWidth + (gap * 4)}px`);
+        ? `${positionWidth + cornerWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + (gap * 6)}px`
+        : `${positionWidth + cornerWidth + modeWidth + weightWidth + backgroundWidth + (gap * 5)}px`);
     widthControl.style.setProperty('--lyrics-theme-color-cycle-right', dynamicThemeToggleVisible
-        ? `${positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + dynamicThemeToggleWidth + (gap * (translationVisible ? 6 : 5))}px`
-        : `${positionWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + (gap * (translationVisible ? 5 : 4))}px`);
+        ? `${positionWidth + cornerWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + dynamicThemeToggleWidth + (gap * (translationVisible ? 7 : 6))}px`
+        : `${positionWidth + cornerWidth + modeWidth + weightWidth + backgroundWidth + translationWidth + (gap * (translationVisible ? 6 : 5))}px`);
 }
 
 function handleSongInfoScroll(event) {
@@ -1145,6 +1152,7 @@ function saveSettings() {
         lyricsDisplayMode: currentLyricsDisplayMode,
         lyricFontWeightPreset: currentLyricFontWeightPreset,
         lyricBackgroundPreset: currentLyricBackgroundPreset,
+        lyricCornerAnchor: getCurrentLyricCornerAnchor(),
         lyricRomanizationMode: currentLyricRomanizationMode,
         lyricTranslationExcludedLanguages: currentLyricTranslationExcludedLanguages,
         dynamicThemeEnabled: getLyricDynamicThemeEnabled(),
@@ -1168,6 +1176,12 @@ function normalizeLyricBackgroundPreset(preset) {
     const normalized = preset.trim().toLowerCase();
     if (normalized === 'soft') return 'solid';
     return LYRIC_BACKGROUND_ORDER.includes(normalized) ? normalized : DEFAULT_LYRIC_BACKGROUND_PRESET;
+}
+
+function normalizeLyricCornerAnchor(anchor) {
+    if (typeof anchor !== 'string') return 'bottom';
+    const normalized = anchor.trim().toLowerCase();
+    return normalized === 'top' ? 'top' : 'bottom';
 }
 
 function normalizeLyricRomanizationMode(mode) {
@@ -1323,6 +1337,13 @@ function getBackgroundIconSvg(preset) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4.2" y="4.6" width="15.6" height="14.8" rx="3.2" fill="#101010" opacity="0.92" stroke="none"/><text x="12" y="15.8" text-anchor="middle" font-size="12" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-weight="700" fill="#ffffff" stroke="none">A</text></svg>`;
 }
 
+function getCornerAnchorIconSvg(anchor) {
+    if (normalizeLyricCornerAnchor(anchor) === 'top') {
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="rotate(-90 12 12)"><path d="M18 8L22 12L18 16"/><line x1="2" y1="12" x2="22" y2="12"/></g></svg>`;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="rotate(90 12 12)"><path d="M18 8L22 12L18 16"/><line x1="2" y1="12" x2="22" y2="12"/></g></svg>`;
+}
+
 function getDynamicThemeIconSvg() {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><text x="12" y="14.8" font-size="11.8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-weight="700" text-anchor="middle" fill="currentColor">A</text><rect x="6.2" y="17.1" width="11.6" height="2.3" rx="1.15" fill="currentColor"/></svg>`;
 }
@@ -1338,6 +1359,7 @@ function resetLyricControlHoverLabels() {
     lyricControlLabelTouched.mode = false;
     lyricControlLabelTouched.font = false;
     lyricControlLabelTouched.background = false;
+    lyricControlLabelTouched.corner = false;
     lyricControlLabelTouched.translation = false;
     lyricControlLabelTouched.position = false;
     lyricControlLabelTouched.dynamic = false;
@@ -1394,6 +1416,41 @@ function updateLyricsBackgroundToggleLabel() {
     }
     btn.setAttribute('aria-label', `Switch lyric background (current: ${preset.label})`);
     btn.setAttribute('title', `Background: ${preset.label}`);
+    syncWidthControlButtonMetrics();
+}
+
+function getCurrentLyricCornerAnchor(layoutContainer = document.getElementById('layout-container')) {
+    if (!layoutContainer) return 'bottom';
+    return layoutContainer.classList.contains('corner-top') ? 'top' : 'bottom';
+}
+
+function applyLyricCornerAnchor(anchor, { persist = true } = {}) {
+    const layoutContainer = document.getElementById('layout-container');
+    if (!layoutContainer) return;
+    const normalized = normalizeLyricCornerAnchor(anchor);
+    layoutContainer.classList.toggle('corner-top', normalized === 'top');
+    syncWidthControlPositionClass();
+    updateLyricsCornerToggleLabel();
+    syncCenterViewportMaxHeight();
+    scheduleViewportSyncAndRecenter();
+    if (persist) saveSettings();
+}
+
+function toggleLyricCornerAnchor() {
+    lyricControlLabelTouched.corner = true;
+    const current = getCurrentLyricCornerAnchor();
+    applyLyricCornerAnchor(current === 'top' ? 'bottom' : 'top', { persist: true });
+}
+
+function updateLyricsCornerToggleLabel() {
+    const btn = document.getElementById('lyrics-corner-toggle');
+    if (!btn) return;
+    const anchor = getCurrentLyricCornerAnchor();
+    const label = anchor === 'top' ? 'Top' : 'Bottom';
+    setLyricButtonLabel(btn, lyricControlLabelTouched.corner ? label : 'Corner');
+    setLyricButtonIcon(btn, getCornerAnchorIconSvg(anchor));
+    btn.setAttribute('aria-label', `Switch lyric corner anchor (current: ${label})`);
+    btn.setAttribute('title', `Corner: ${label}`);
     syncWidthControlButtonMetrics();
 }
 
@@ -1554,6 +1611,7 @@ function updateAllLyricControlLabels() {
     updateLyricsDisplayModeToggleLabel();
     updateLyricsFontWeightToggleLabel();
     updateLyricsBackgroundToggleLabel();
+    updateLyricsCornerToggleLabel();
     updateLyricsTranslationToggleLabel();
     updateLyricsDynamicThemeToggleLabel();
     updateLyricsThemeColorCycleLabel();
@@ -1678,6 +1736,7 @@ function syncWidthControlPositionClass() {
     const position = getCurrentLayoutPosition(layoutContainer);
     widthControl.classList.toggle('position-right', position === 'right');
     widthControl.classList.toggle('position-center', position === 'center');
+    widthControl.classList.toggle('corner-top', getCurrentLyricCornerAnchor(layoutContainer) === 'top');
     if (closeControl) {
         // Keep close button fixed at center.
         closeControl.classList.remove('position-right', 'position-center');
@@ -1961,6 +2020,7 @@ function applySavedSettings() {
         });
         applyLyricFontWeightPreset(settings.lyricFontWeightPreset || DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
+        applyLyricCornerAnchor(settings.lyricCornerAnchor || 'bottom', { persist: false });
         currentLyricTranslationExcludedLanguages = normalizeTranslationExcludedLanguages(settings.lyricTranslationExcludedLanguages);
         window.__lyricTranslationExcludedLanguages = getLyricTranslationExcludedLanguages();
         const savedRomanizationMode = settings.lyricRomanizationMode
@@ -1984,6 +2044,7 @@ function applySavedSettings() {
         });
         applyLyricFontWeightPreset(DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET, { persist: false });
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
+        applyLyricCornerAnchor('bottom', { persist: false });
         currentLyricTranslationExcludedLanguages = [];
         window.__lyricTranslationExcludedLanguages = [];
         applyLyricRomanizationMode('both', { persist: false });
@@ -2548,6 +2609,7 @@ async function init() {
         cycleLyricsDisplayMode,
         cycleLyricFontWeightPreset,
         cycleLyricBackgroundPreset,
+        toggleLyricCornerAnchor,
         toggleLyricTranslation: toggleLyricTranslationButton,
         toggleLyricDynamicTheme: toggleLyricDynamicThemeButton,
         cycleLyricThemeColor: cycleLyricThemeColorButton,
