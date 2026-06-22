@@ -40,7 +40,7 @@
   --lyrics-corner-left: var(--lyrics-corner-inset);
   --lyrics-corner-right: var(--lyrics-corner-inset);
   --lyrics-corner-bottom: var(--lyrics-corner-inset);
-  --lyrics-window-controls-safe-top: 72px;
+  --lyrics-window-controls-safe-top: 90px;
   --lyrics-available-width: calc(100% - var(--lyrics-corner-left) - var(--lyrics-corner-right));
   --lyrics-max-width-px: calc(var(--lyrics-available-width) * (var(--lyrics-max-width, 30%) / 100%));
   --hover-color: #000000ab;
@@ -501,8 +501,20 @@ body.window-resizing #close-window-control {
 }
 
 #layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode {
-  margin-top: 24px;
+  justify-content: flex-start;
+  margin-top: 0;
   margin-bottom: 0;
+}
+
+#layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode #synced-lyrics,
+#layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode #plain-lyrics {
+  justify-content: flex-start;
+  padding-top: 24px;
+  padding-bottom: 0;
+}
+
+#layout-container.corner-top:not(.position-center) #lyrics-container.scroll-line-mode {
+  padding-top: 24px !important;
 }
 
 #layout-container.position-center {
