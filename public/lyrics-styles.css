@@ -40,7 +40,7 @@
   --lyrics-corner-left: var(--lyrics-corner-inset);
   --lyrics-corner-right: var(--lyrics-corner-inset);
   --lyrics-corner-bottom: var(--lyrics-corner-inset);
-  --lyrics-window-controls-safe-top: 64px;
+  --lyrics-window-controls-safe-top: 128px;
   --lyrics-available-width: calc(100% - var(--lyrics-corner-left) - var(--lyrics-corner-right));
   --lyrics-max-width-px: calc(var(--lyrics-available-width) * (var(--lyrics-max-width, 30%) / 100%));
   --hover-color: #000000ab;

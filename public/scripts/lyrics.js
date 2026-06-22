@@ -1424,11 +1424,30 @@ function getCurrentLyricCornerAnchor(layoutContainer = document.getElementById('
     return layoutContainer.classList.contains('corner-top') ? 'top' : 'bottom';
 }
 
+function isTopCornerAnchorActive() {
+    return getCurrentLyricCornerAnchor() === 'top'
+        && getCurrentLayoutPosition() !== 'center';
+}
+
+function normalizeLyricDisplayModeForCurrentCorner(mode) {
+    const normalized = normalizeLyricDisplayMode(mode);
+    if (!isTopCornerAnchorActive()) return normalized;
+    return normalized === 'scroll' || normalized === 'fixed-1'
+        ? normalized
+        : 'fixed-1';
+}
+
 function applyLyricCornerAnchor(anchor, { persist = true } = {}) {
     const layoutContainer = document.getElementById('layout-container');
     if (!layoutContainer) return;
     const normalized = normalizeLyricCornerAnchor(anchor);
     layoutContainer.classList.toggle('corner-top', normalized === 'top');
+    if (normalized === 'top' && isTopCornerAnchorActive()) {
+        const safeMode = normalizeLyricDisplayModeForCurrentCorner(currentLyricsDisplayMode || getLyricDisplayMode());
+        if (safeMode !== currentLyricsDisplayMode) {
+            applyLyricsDisplayMode(safeMode, { persist: false, refresh: true });
+        }
+    }
     syncWidthControlPositionClass();
     updateLyricsCornerToggleLabel();
     syncCenterViewportMaxHeight();
@@ -1627,6 +1646,9 @@ function handleLyricWheelDelta(delta) {
 }
 
 function getNextLyricDisplayMode(mode) {
+    if (isTopCornerAnchorActive()) {
+        return normalizeLyricDisplayMode(mode) === 'scroll' ? 'fixed-1' : 'scroll';
+    }
     const normalized = normalizeLyricDisplayMode(mode);
     const idx = LYRIC_DISPLAY_MODE_ORDER.indexOf(normalized);
     if (idx < 0) return DEFAULT_LYRIC_DISPLAY_MODE;
@@ -1634,7 +1656,7 @@ function getNextLyricDisplayMode(mode) {
 }
 
 function applyLyricsDisplayMode(mode, { persist = true, refresh = true } = {}) {
-    const normalized = normalizeLyricDisplayMode(mode);
+    const normalized = normalizeLyricDisplayModeForCurrentCorner(mode);
     currentLyricsDisplayMode = normalized;
     const visibleLines = LYRIC_DISPLAY_MODE_VISIBLE_LINES[normalized] || LYRIC_DISPLAY_MODE_VISIBLE_LINES[DEFAULT_LYRIC_DISPLAY_MODE];
     document.documentElement.style.setProperty('--lyrics-visible-lines', String(visibleLines));
@@ -1704,6 +1726,12 @@ function applyLayoutPosition(position) {
     const normalized = LAYOUT_POSITION_ORDER.includes(position) ? position : 'left';
     layoutContainer.classList.toggle('position-right', normalized === 'right');
     layoutContainer.classList.toggle('position-center', normalized === 'center');
+    if (isTopCornerAnchorActive()) {
+        const safeMode = normalizeLyricDisplayModeForCurrentCorner(currentLyricsDisplayMode || getLyricDisplayMode());
+        if (safeMode !== currentLyricsDisplayMode) {
+            applyLyricsDisplayMode(safeMode, { persist: false, refresh: true });
+        }
+    }
     syncWidthControlPositionClass();
     updateLyricsPositionToggleLabel();
 }
