@@ -1173,7 +1173,7 @@ function normalizeLyricBackgroundPreset(preset) {
 function normalizeLyricRomanizationMode(mode) {
     if (typeof mode !== 'string') return 'both';
     const normalized = mode.trim().toLowerCase();
-    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'both';
+    return ['romanized', 'both', 'translated', 'off'].includes(normalized) ? normalized : 'both';
 }
 
 function hasRenderedRomanizedLines() {
@@ -1193,10 +1193,10 @@ function getLyricAssistCapabilities() {
 
 function getLyricAssistToggleOrder() {
     const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
-    if (hasRomanized && hasTranslation) return ['romanized', 'both', 'off'];
-    if (hasTranslation) return ['both', 'off'];
+    if (hasRomanized && hasTranslation) return ['romanized', 'both', 'translated', 'off'];
+    if (hasTranslation) return ['translated', 'off'];
     if (hasRomanized) return ['romanized', 'off'];
-    return ['both', 'off'];
+    return ['romanized', 'both', 'translated', 'off'];
 }
 
 function normalizeLyricAssistModeForAvailableContent(mode) {
@@ -1209,7 +1209,8 @@ function normalizeLyricAssistModeForAvailableContent(mode) {
 function applyLyricRomanizationMode(mode, { persist = true } = {}) {
     currentLyricRomanizationMode = normalizeLyricAssistModeForAvailableContent(mode);
     const root = document.documentElement;
-    root.classList.toggle('lyrics-translation-hidden', currentLyricRomanizationMode !== 'both');
+    root.classList.toggle('lyrics-translation-hidden', !['both', 'translated'].includes(currentLyricRomanizationMode));
+    root.classList.toggle('lyrics-romanization-hidden', currentLyricRomanizationMode === 'translated');
     root.classList.toggle('lyrics-romanization-off', currentLyricRomanizationMode === 'off');
     updateLyricsTranslationToggleLabel();
     requestAnimationFrame(() => {
@@ -1409,22 +1410,26 @@ function updateLyricsTranslationToggleLabel() {
 
     const labelMap = isTranslationOnly
         ? {
+            translated: 'Translated',
             both: 'Translated',
             off: 'Off'
         }
         : {
             romanized: 'Romanized',
-            both: 'Translated',
+            both: 'Romanized+Translated',
+            translated: 'Translated',
             off: 'Off'
         };
     const titleMap = isTranslationOnly
         ? {
+            translated: 'Translation: On',
             both: 'Translation: On',
             off: 'Translation: Off'
         }
         : {
             romanized: 'Romanization: On',
             both: 'Romanization + Translation: On',
+            translated: 'Translation: On',
             off: 'Romanization + Translation: Off'
         };
     const baseLabel = isTranslationOnly ? 'Translation' : 'Romanization';

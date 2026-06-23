@@ -329,15 +329,21 @@ html {
   display: none !important;
 }
 
+:root.lyrics-romanization-hidden .lyric-line .romanized {
+  display: none !important;
+}
+
 :root.lyrics-romanization-off .lyric-line .romanized,
 :root.lyrics-romanization-off .lyric-line .lyric-translation {
   display: none !important;
 }
 
+:root.lyrics-romanization-hidden .lyric-line.romanizable .text-lyrics,
 :root.lyrics-romanization-off .lyric-line.romanizable .text-lyrics {
   display: block;
 }
 
+:root.lyrics-romanization-hidden .lyric-line.romanizable .text-lyrics > .lyric-words,
 :root.lyrics-romanization-off .lyric-line.romanizable .text-lyrics > .lyric-words {
   display: inline;
   font-size: var(--lyric-font-size, 27px) !important;
