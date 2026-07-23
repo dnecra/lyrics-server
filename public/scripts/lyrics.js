@@ -318,6 +318,7 @@ let lowResLyricFontSizeOffset = 0;
 let currentLyricFontWeightPreset = DEFAULT_LYRICS_PAGE_FONT_WEIGHT_PRESET;
 let currentLyricBackgroundPreset = DEFAULT_LYRIC_BACKGROUND_PRESET;
 let currentLyricRomanizationMode = 'both';
+let currentLyricTranslationMode = 'translated';
 let currentLyricTranslationExcludedLanguages = [];
 const lyricControlLabelTouched = {
     mode: false,
@@ -1146,6 +1147,7 @@ function saveSettings() {
         lyricFontWeightPreset: currentLyricFontWeightPreset,
         lyricBackgroundPreset: currentLyricBackgroundPreset,
         lyricRomanizationMode: currentLyricRomanizationMode,
+        lyricTranslationMode: currentLyricTranslationMode,
         lyricTranslationExcludedLanguages: currentLyricTranslationExcludedLanguages,
         dynamicThemeEnabled: getLyricDynamicThemeEnabled(),
         themeColorIndex: currentManualLyricThemeColorIndex,
@@ -1173,7 +1175,14 @@ function normalizeLyricBackgroundPreset(preset) {
 function normalizeLyricRomanizationMode(mode) {
     if (typeof mode !== 'string') return 'both';
     const normalized = mode.trim().toLowerCase();
-    return ['romanized', 'both', 'translated', 'off'].includes(normalized) ? normalized : 'both';
+    return ['romanized', 'both', 'off'].includes(normalized) ? normalized : 'both';
+}
+
+function normalizeLyricTranslationMode(mode) {
+    if (typeof mode !== 'string') return 'translated';
+    const normalized = mode.trim().toLowerCase();
+    if (normalized === 'both') return 'translated';
+    return ['translated', 'off'].includes(normalized) ? normalized : 'translated';
 }
 
 function hasRenderedRomanizedLines() {
@@ -1193,30 +1202,55 @@ function getLyricAssistCapabilities() {
 
 function getLyricAssistToggleOrder() {
     const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
-    if (hasRomanized && hasTranslation) return ['romanized', 'both', 'translated', 'off'];
-    if (hasTranslation) return ['translated', 'off'];
+    if (hasRomanized && hasTranslation) return ['romanized', 'both', 'off'];
     if (hasRomanized) return ['romanized', 'off'];
-    return ['romanized', 'both', 'translated', 'off'];
+    if (hasTranslation) return ['translated', 'off'];
+    return ['romanized', 'both', 'off'];
+}
+
+function getCurrentLyricAssistModeForAvailableContent() {
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    if (hasRomanized) return currentLyricRomanizationMode;
+    if (hasTranslation) return currentLyricTranslationMode;
+    return currentLyricRomanizationMode;
+}
+
+function setCurrentLyricAssistModeForAvailableContent(mode) {
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    if (hasRomanized || !hasTranslation) {
+        currentLyricRomanizationMode = normalizeLyricRomanizationMode(mode);
+    } else {
+        currentLyricTranslationMode = normalizeLyricTranslationMode(mode);
+    }
 }
 
 function normalizeLyricAssistModeForAvailableContent(mode) {
-    const normalized = normalizeLyricRomanizationMode(mode);
+    const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
+    const normalized = hasRomanized || !hasTranslation
+        ? normalizeLyricRomanizationMode(mode)
+        : normalizeLyricTranslationMode(mode);
     const order = getLyricAssistToggleOrder();
     if (order.includes(normalized)) return normalized;
     return order[0] || 'off';
 }
 
-function applyLyricRomanizationMode(mode, { persist = true } = {}) {
-    currentLyricRomanizationMode = normalizeLyricAssistModeForAvailableContent(mode);
+function applyLyricAssistVisibility({ persist = true } = {}) {
+    const mode = normalizeLyricAssistModeForAvailableContent(getCurrentLyricAssistModeForAvailableContent());
     const root = document.documentElement;
-    root.classList.toggle('lyrics-translation-hidden', !['both', 'translated'].includes(currentLyricRomanizationMode));
-    root.classList.toggle('lyrics-romanization-hidden', currentLyricRomanizationMode === 'translated');
-    root.classList.toggle('lyrics-romanization-off', currentLyricRomanizationMode === 'off');
+    root.classList.toggle('lyrics-translation-hidden', !['both', 'translated'].includes(mode));
+    root.classList.toggle('lyrics-romanization-hidden', false);
+    root.classList.toggle('lyrics-romanization-off', mode === 'off');
     updateLyricsTranslationToggleLabel();
     requestAnimationFrame(() => {
         scheduleViewportSyncAndRecenter();
     });
     if (persist) saveSettings();
+    return mode;
+}
+
+function applyLyricRomanizationMode(mode, { persist = true } = {}) {
+    setCurrentLyricAssistModeForAvailableContent(mode);
+    applyLyricAssistVisibility({ persist });
 }
 
 function hasVisibleLyricAssistLines() {
@@ -1241,7 +1275,7 @@ function initTranslationToggleVisibilityObserver() {
     if (!synced && !plain) return;
 
     translationToggleVisibilityObserver = new MutationObserver(() => {
-        syncTranslationToggleVisibility();
+        applyLyricAssistVisibility({ persist: false });
     });
 
     if (synced) translationToggleVisibilityObserver.observe(synced, { childList: true, subtree: true });
@@ -1405,31 +1439,26 @@ function updateLyricsTranslationToggleLabel() {
     if (btn.hidden) return;
     const { hasRomanized, hasTranslation } = getLyricAssistCapabilities();
     const isTranslationOnly = hasTranslation && !hasRomanized;
-    const mode = normalizeLyricAssistModeForAvailableContent(currentLyricRomanizationMode);
-    currentLyricRomanizationMode = mode;
+    const mode = normalizeLyricAssistModeForAvailableContent(getCurrentLyricAssistModeForAvailableContent());
 
     const labelMap = isTranslationOnly
         ? {
             translated: 'Translated',
-            both: 'Translated',
             off: 'Off'
         }
         : {
             romanized: 'Romanized',
             both: 'Romanized+Translated',
-            translated: 'Translated',
             off: 'Off'
         };
     const titleMap = isTranslationOnly
         ? {
             translated: 'Translation: On',
-            both: 'Translation: On',
             off: 'Translation: Off'
         }
         : {
             romanized: 'Romanization: On',
             both: 'Romanization + Translation: On',
-            translated: 'Translation: On',
             off: 'Romanization + Translation: Off'
         };
     const baseLabel = isTranslationOnly ? 'Translation' : 'Romanization';
@@ -1523,7 +1552,7 @@ function cycleLyricThemeColorButton() {
 function toggleLyricTranslationButton() {
     lyricControlLabelTouched.translation = true;
     const order = getLyricAssistToggleOrder();
-    const currentIndex = order.indexOf(normalizeLyricAssistModeForAvailableContent(currentLyricRomanizationMode));
+    const currentIndex = order.indexOf(normalizeLyricAssistModeForAvailableContent(getCurrentLyricAssistModeForAvailableContent()));
     const nextMode = order[(currentIndex + 1) % order.length];
     applyLyricRomanizationMode(nextMode, { persist: true });
 }
@@ -1968,9 +1997,18 @@ function applySavedSettings() {
         applyLyricBackgroundPreset(settings.lyricBackgroundPreset || DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
         currentLyricTranslationExcludedLanguages = normalizeTranslationExcludedLanguages(settings.lyricTranslationExcludedLanguages);
         window.__lyricTranslationExcludedLanguages = getLyricTranslationExcludedLanguages();
-        const savedRomanizationMode = settings.lyricRomanizationMode
-            || (settings.lyricTranslationEnabled === true ? 'both' : 'both');
-        applyLyricRomanizationMode(savedRomanizationMode, { persist: false });
+        const legacyAssistMode = typeof settings.lyricRomanizationMode === 'string'
+            ? settings.lyricRomanizationMode.trim().toLowerCase()
+            : '';
+        currentLyricRomanizationMode = normalizeLyricRomanizationMode(settings.lyricRomanizationMode);
+        currentLyricTranslationMode = normalizeLyricTranslationMode(
+            settings.lyricTranslationMode
+            || (legacyAssistMode === 'translated' ? 'translated' : '')
+            || (legacyAssistMode === 'both' ? 'translated' : '')
+            || (legacyAssistMode === 'off' ? 'off' : '')
+            || (settings.lyricTranslationEnabled === false ? 'off' : 'translated')
+        );
+        applyLyricAssistVisibility({ persist: false });
 
         syncWidthControlPositionClass();
         updateLyricsPositionToggleLabel();
@@ -1991,7 +2029,9 @@ function applySavedSettings() {
         applyLyricBackgroundPreset(DEFAULT_LYRIC_BACKGROUND_PRESET, { persist: false });
         currentLyricTranslationExcludedLanguages = [];
         window.__lyricTranslationExcludedLanguages = [];
-        applyLyricRomanizationMode('both', { persist: false });
+        currentLyricRomanizationMode = 'both';
+        currentLyricTranslationMode = 'translated';
+        applyLyricAssistVisibility({ persist: false });
     }
 
     applyLyricSizing();
