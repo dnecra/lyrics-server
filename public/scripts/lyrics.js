@@ -1,12 +1,12 @@
 import { API_URL, state, resetSongState } from './modules/config.js';
 import { initWebSocket } from './modules/connection.js';
-import { ensureLyricsSongInfoVisible, updateNowPlayingFromData } from './modules/now-playing.js';
+import { ensureLyricsSongInfoVisible, updateNowPlayingFromData } from './modules/now-playing.js?v=2';
 import { fetchLyrics, updateLyricsDisplay, displayLyricsUI, hideLyricsUI, getLyricDisplayMode, setLyricDisplayMode, centerActiveLyricLineStrict } from './modules/lyric.js';
 import {
     initLyricDynamicTheme,
     getLyricDynamicThemeEnabled,
     setLyricDynamicThemeEnabled
-} from './modules/lyric-dynamic-theme.js';
+} from './modules/lyric-dynamic-theme.js?v=2';
 import {
     initLyricControlPanel,
     DEFAULT_FONT_SIZE,

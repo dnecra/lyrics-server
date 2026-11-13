@@ -1,7 +1,7 @@
 import { state, resetSongState } from './config.js';
 import { getThumbnailUrl } from './connection.js';
 import { fetchLyrics, updateLyricsDisplay } from './lyric.js';
-import { refreshLyricDynamicTheme } from './lyric-dynamic-theme.js';
+import { refreshLyricDynamicTheme } from './lyric-dynamic-theme.js?v=2';
 
 const FALLBACK_ALBUM_COVER_SRC = '/icons/album-cover-placeholder.png';
 const LOCAL_PROGRESS_INTERVAL_MS = 250;

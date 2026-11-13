@@ -907,7 +907,7 @@ body.window-resizing #close-window-control {
 #song-info .artist {
   font-size: clamp(10px, 0.521vw, 12px);
   font-weight: 700;
-  color: var(--text-secondary-var1);
+  color: var(--text-secondary);
   transition: color 500ms ease, opacity 500ms ease;
   cursor: default;
   -webkit-user-select: none;
