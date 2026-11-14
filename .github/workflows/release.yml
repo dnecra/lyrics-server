@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Optional release tag (example: v1.0.4). Leave empty to auto-increment the latest patch tag.'
+        description: 'Optional release tag (example: v1.4.0). Leave empty to use package.json version when it is newer, otherwise increment the latest patch tag.'
         required: false
         type: string
 
@@ -30,22 +30,34 @@ jobs:
 
         if ($manualTag) {
           if ($manualTag -notmatch '^v\d+\.\d+\.\d+$') {
-            throw "Tag must look like v1.0.4"
+            throw "Tag must look like v1.4.0"
           }
 
           $tag = $manualTag
         } else {
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($packageVersion -notmatch '^\d+\.\d+\.\d+$') {
+            throw "package.json version '$packageVersion' is not in <major>.<minor>.<patch> format"
+          }
+          $packageTag = "v$packageVersion"
+          $packageVersionNumber = [version]$packageVersion
+
           $latestTag = git tag --sort=-v:refname | Select-Object -First 1
 
           if (-not $latestTag) {
-            $tag = "v1.0.0"
+            $tag = $packageTag
           } elseif ($latestTag -notmatch '^v(\d+)\.(\d+)\.(\d+)$') {
             throw "Latest tag '$latestTag' is not in v<major>.<minor>.<patch> format"
           } else {
             $major = [int]$matches[1]
             $minor = [int]$matches[2]
             $patch = [int]$matches[3] + 1
-            $tag = "v$major.$minor.$patch"
+            $nextVersion = [version]::new($major, $minor, $patch)
+            if ($packageVersionNumber -gt $nextVersion) {
+              $tag = $packageTag
+            } else {
+              $tag = "v$nextVersion"
+            }
           }
         }
 
@@ -66,16 +78,11 @@ jobs:
         git tag $tag
         git push origin $tag
 
-    - name: Install pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 9
-
-    - name: Use Node.js 24 & Setup Cache
+    - name: Use Node.js 24
       uses: actions/setup-node@v4
       with:
         node-version: 24.13.0
-        cache: 'pnpm'
+        cache: npm
 
     - name: Setup .NET 10 SDK
       uses: actions/setup-dotnet@v4
@@ -93,10 +100,10 @@ jobs:
         7z
 
     - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      run: npm ci
 
     - name: Build
-      run: pnpm run build
+      run: npm run build
 
     - name: Show build sizes
       shell: powershell

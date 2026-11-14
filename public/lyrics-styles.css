@@ -40,7 +40,6 @@
   --lyrics-corner-left: var(--lyrics-corner-inset);
   --lyrics-corner-right: var(--lyrics-corner-inset);
   --lyrics-corner-bottom: var(--lyrics-corner-inset);
-  --lyrics-window-controls-safe-top: 90px;
   --lyrics-available-width: calc(100% - var(--lyrics-corner-left) - var(--lyrics-corner-right));
   --lyrics-max-width-px: calc(var(--lyrics-available-width) * (var(--lyrics-max-width, 30%) / 100%));
   --hover-color: #000000ab;
@@ -484,37 +483,6 @@ body.window-resizing #close-window-control {
 
 #layout-container.position-right {
   align-items: flex-end;
-}
-
-#layout-container.corner-top:not(.position-center) {
-  top: max(var(--lyrics-corner-inset), var(--lyrics-window-controls-safe-top));
-  bottom: var(--lyrics-corner-inset);
-  justify-content: flex-start;
-}
-
-#layout-container.corner-top:not(.position-center) #song-info {
-  order: 0;
-}
-
-#layout-container.corner-top:not(.position-center) #lyrics-container {
-  order: 1;
-}
-
-#layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode {
-  justify-content: flex-start;
-  margin-top: 0;
-  margin-bottom: 0;
-}
-
-#layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode #synced-lyrics,
-#layout-container.corner-top:not(.position-center) #lyrics-container.fixed-line-mode #plain-lyrics {
-  justify-content: flex-start;
-  padding-top: 24px;
-  padding-bottom: 0;
-}
-
-#layout-container.corner-top:not(.position-center) #lyrics-container.scroll-line-mode {
-  padding-top: 24px !important;
 }
 
 #layout-container.position-center {
@@ -1275,7 +1243,7 @@ body.window-resizing #close-window-control {
   transform: translateY(0) scale(0.96);
 }
 
-/* Legacy close-window-control path. */
+/* Match /welcome close control style for lyrics page (legacy close-window-control path). */
 #close-window-control {
   top: 64px;
   left: 50%;
